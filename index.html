@@ -4,12 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>手势控制：吉依卡哇与粒子圣诞树</title>
-    <!-- 使用全局脚本引入，最大化微信兼容性 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r162/three.min.js"></script>
-    <script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://threejs.org/examples/js/loaders/MMDLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm/vision_bundle.js"></script>
-    
+    <!-- 使用全局脚本，这是微信环境兼容性的关键 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -17,179 +14,80 @@
             overflow: hidden; 
             background-color: #000; 
             font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-            touch-action: none; /* 防止触摸引发页面缩放 */
             -webkit-tap-highlight-color: transparent;
         }
         #container { 
             position: absolute; 
-            top: 0; 
-            left: 0; 
-            width: 100vw; 
-            height: 100vh; 
+            top: 0; left: 0; 
+            width: 100vw; height: 100vh; 
             z-index: 1; 
         }
-        
-        /* 状态提示 */
         #status {
-            position: absolute;
-            top: 20px;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            color: #00ffea;
-            text-shadow: 0 0 8px #00ffea;
-            z-index: 20;
-            pointer-events: none;
-            font-size: 16px;
-            font-weight: bold;
-            padding: 0 15px;
+            position: absolute; top: 20px; left: 0;
+            width: 100%; text-align: center;
+            color: #4cd964; z-index: 20;
+            pointer-events: none; font-size: 16px;
+            font-weight: bold; padding: 0 15px;
+            text-shadow: 0 0 5px rgba(0,0,0,0.8);
         }
-        
-        /* 底部控制面板 */
-        #control-panel {
-            position: absolute;
-            bottom: 25px;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            z-index: 10;
-        }
-        .control-box {
-            display: inline-block;
-            background: rgba(0, 10, 20, 0.75);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 12px 20px;
-            border: 1px solid rgba(0, 255, 255, 0.3);
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
-        }
-        .btn-row {
-            margin-bottom: 8px;
-        }
-        .btn-row:last-child {
-            margin-bottom: 0;
-        }
-        button {
-            background: rgba(30, 30, 60, 0.7);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            margin: 0 4px;
-            border-radius: 50px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.3s;
-            min-width: 80px;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-        }
-        button:hover, button.active {
-            background: rgba(0, 150, 255, 0.8);
-            border-color: #00aaff;
-            box-shadow: 0 0 15px rgba(0, 170, 255, 0.7);
-        }
-        button.test-btn {
-            background: rgba(255, 100, 0, 0.7);
-        }
-        button.test-btn:hover {
-            background: rgba(255, 50, 0, 0.9);
-            box-shadow: 0 0 15px rgba(255, 100, 0, 0.7);
-        }
-        #gesture-hint {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 13px;
-            margin-top: 8px;
-            text-shadow: 0 0 5px black;
-        }
-        
-        /* 隐藏的视频元素 - 在iOS微信中必须存在且播放 */
-        #video-preview {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 1px;
-            height: 1px;
-            opacity: 0.001;
-            z-index: -1;
-            pointer-events: none;
-            object-fit: cover;
-        }
-        
-        /* 加载覆盖层 */
         #loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #000;
-            z-index: 100;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            color: #00ffea;
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #000; z-index: 100;
+            display: flex; justify-content: center;
+            align-items: center; flex-direction: column;
+            color: #4cd964;
         }
-        #loading-text {
-            margin-top: 20px;
-            font-size: 18px;
-            text-align: center;
-        }
+        #loading-text { margin-top: 20px; font-size: 18px; }
         .spinner {
-            width: 60px;
-            height: 60px;
-            border: 5px solid rgba(0, 255, 234, 0.3);
-            border-top-color: #00ffea;
+            width: 50px; height: 50px;
+            border: 4px solid rgba(76, 217, 100, 0.2);
+            border-top-color: #4cd964;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #control-panel {
+            position: absolute; bottom: 20px; left: 0;
+            width: 100%; text-align: center; z-index: 10;
         }
-        
-        /* 调试信息面板 (默认隐藏，需要时开启) */
-        #debug-panel {
-            position: absolute;
-            top: 60px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            color: #0f0;
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            font-family: monospace;
-            z-index: 5;
-            max-width: 300px;
-            display: none; /* 默认隐藏，按D键显示 */
+        .control-box {
+            display: inline-block;
+            background: rgba(0, 20, 30, 0.85);
+            border-radius: 20px; padding: 12px 20px;
+            border: 1px solid rgba(0, 255, 200, 0.4);
+            box-shadow: 0 0 20px rgba(0, 255, 200, 0.2);
+        }
+        .btn-row { margin-bottom: 8px; }
+        button {
+            background: rgba(40, 40, 80, 0.8);
+            color: white; border: none; padding: 8px 16px;
+            margin: 0 4px; border-radius: 50px; font-size: 14px;
+            cursor: pointer; min-width: 80px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.2s;
+        }
+        button:hover, button.active {
+            background: rgba(0, 180, 255, 0.9);
+            border-color: #00b4ff;
+        }
+        button.test-btn { background: rgba(255, 80, 0, 0.8); }
+        button.test-btn:hover { background: rgba(255, 50, 0, 0.9); }
+        #video-preview {
+            position: absolute; top: 0; left: 0;
+            width: 1px; height: 1px; opacity: 0.001;
+            z-index: -1; pointer-events: none;
         }
     </style>
 </head>
 <body>
-
-    <!-- 加载覆盖层 -->
     <div id="loading-overlay">
         <div class="spinner"></div>
-        <div id="loading-text">正在加载奇幻世界...</div>
+        <div id="loading-text">正在初始化...</div>
     </div>
-
-    <!-- 状态提示 -->
-    <div id="status">准备启动摄像头...</div>
-    
-    <!-- 调试信息面板 -->
-    <div id="debug-panel">
-        <div>手势状态: <span id="debug-state">等待检测</span></div>
-        <div>距离值: <span id="debug-dist">0.00</span></div>
-        <div>握拳分数: <span id="debug-fist">0</span></div>
-        <div>手掌跨度: <span id="debug-span">0.00</span></div>
-    </div>
-
-    <!-- 隐藏的视频元素 -->
+    <div id="status">准备启动...</div>
     <video id="video-preview" playsinline webkit-playsinline muted></video>
-
-    <!-- 3D渲染容器 -->
     <div id="container"></div>
-
-    <!-- 底部控制面板 -->
     <div id="control-panel">
         <div class="control-box">
             <div class="btn-row">
@@ -201,147 +99,160 @@
                 <button onclick="forceShape('tree')" class="test-btn">测试：变树</button>
                 <button onclick="forceShape('firework')" class="test-btn">测试：烟花</button>
                 <button onclick="forceShape('random')" class="test-btn">测试：随机</button>
-                <button onclick="startCamera()">重启摄像头</button>
+                <button onclick="initCamera()">启动摄像头</button>
             </div>
-            <div id="gesture-hint">
-                ✊ 握拳 → 粒子聚合成圣诞树 | ✋ 张手 → 粒子烟花散开
+            <div style="color: rgba(255,255,255,0.7); font-size: 13px; margin-top: 8px;">
+                ✊ 握拳 → 圣诞树 | ✋ 张手 → 烟花
             </div>
         </div>
     </div>
 
-    <!-- 主应用脚本 -->
     <script>
-        // ========== 全局变量声明 ==========
+        // === 全局变量 ===
         let scene, camera, renderer, controls;
         let particles = [], particleGroup;
         let currentModel = null, currentModelName = 'hachiware';
         let targetShape = 'random', isHandDetected = false;
         let handPosition = new THREE.Vector3(0, 0, 0);
         let clock = new THREE.Clock();
-        let handLandmarker = null, webcamRunning = false, lastVideoTime = -1;
-        
-        // 圣诞树参数
-        const TREE_HEIGHT = 25, TREE_RADIUS = 10, PARTICLE_COUNT = 1200;
-        
-        // 模型文件映射 (请确保文件与html在同一目录)
-        const MODELS = {
-            'hachiware': './hachiware.pmx',
-            'usagi': './usagi.pmx',
-            'chiikawa': './chiikawa.pmx'
-        };
-        
-        // 备用颜色 (如果模型加载失败)
-        const MODEL_COLORS = {
-            'hachiware': 0x6495ED, // 蓝色
-            'usagi': 0xFFD700,     // 金色
-            'chiikawa': 0xFF69B4   // 粉色
-        };
-        
-        // ========== 初始化入口 ==========
-        document.addEventListener('DOMContentLoaded', async function() {
-            // 隐藏加载界面
-            document.getElementById('loading-overlay').style.display = 'none';
-            
-            // 设置场景
-            setupScene();
-            
-            // 创建粒子
-            createParticles();
-            
-            // 加载默认模型
-            loadMMDModel('hachiware');
-            
-            // 初始化手势识别 (带错误处理)
-            try {
-                await setupMediaPipe();
-            } catch (error) {
-                console.error("AI初始化失败:", error);
-                document.getElementById('status').innerText = "AI加载失败，可使用手动测试按钮";
+        let handLandmarker = null, webcamRunning = false;
+
+        // 常量
+        const TREE_HEIGHT = 25, TREE_RADIUS = 10, PARTICLE_COUNT = 800;
+
+        // === 1. 安全初始化入口 ===
+        window.onload = function() {
+            console.log("页面加载完成，开始初始化...");
+            // 初始化vConsole调试工具（移动端看日志）
+            if (typeof VConsole !== 'undefined') {
+                var vConsole = new VConsole();
+                console.log('vConsole 调试工具已启用');
             }
             
-            // 开始动画循环
-            animate();
+            // 第一步：检查Three.js是否加载成功
+            if (!window.THREE) {
+                showError("Three.js库加载失败，请刷新重试");
+                return;
+            }
+            console.log("✓ Three.js 加载成功");
             
-            // 绑定键盘事件 (按D显示调试信息)
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'd' || e.key === 'D') {
-                    const debugPanel = document.getElementById('debug-panel');
-                    debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
+            // 第二步：设置3D场景（最核心且必须成功）
+            try {
+                setupScene();
+                createParticles();
+                console.log("✓ 3D场景与粒子系统初始化成功");
+            } catch (sceneError) {
+                showError("3D场景初始化失败: " + sceneError.message);
+                return;
+            }
+            
+            // 第三步：加载角色模型（允许失败，有备用方案）
+            setTimeout(function() {
+                loadModel('hachiware');
+            }, 100);
+            
+            // 第四步：初始化手势识别（异步，允许失败）
+            setTimeout(function() {
+                initHandTracking().then(function() {
+                    console.log("✓ 手势识别初始化成功");
+                }).catch(function(err) {
+                    console.warn("手势识别初始化失败，可使用手动测试按钮:", err);
+                    document.getElementById('status').innerText = "手势识别加载失败，请使用手动测试按钮";
+                });
+            }, 300);
+            
+            // 第五步：隐藏加载界面
+            setTimeout(function() {
+                document.getElementById('loading-overlay').style.display = 'none';
+                console.log("✓ 加载界面已隐藏");
+                document.getElementById('status').innerText = "初始化完成！请点击「启动摄像头」";
+            }, 1000); // 1秒后隐藏，确保主场景可见
+            
+            // 第六步：开始动画循环
+            setTimeout(function() {
+                try {
+                    animate();
+                    console.log("✓ 动画循环已启动");
+                } catch (e) {
+                    console.error("动画循环启动失败:", e);
                 }
-            });
-        });
-        
-        // ========== 1. 场景设置 ==========
+            }, 1500);
+        };
+
+        function showError(msg) {
+            console.error(msg);
+            var overlay = document.getElementById('loading-overlay');
+            overlay.innerHTML = '<div style="color:#ff5555; text-align:center; padding:20px; max-width:300px;">' +
+                '<h3>初始化失败</h3><p>' + msg + '</p>' +
+                '<p>请尝试：</p><p>1. 刷新页面</p><p>2. 使用Chrome浏览器测试</p>' +
+                '<button onclick="location.reload()" style="padding:10px 20px; margin-top:15px; background:#ff5555; color:white; border:none; border-radius:5px;">点击重试</button>' +
+                '</div>';
+        }
+
+        // === 2. 3D场景设置 ===
         function setupScene() {
             const container = document.getElementById('container');
-            
             // 场景
             scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x0a0a20, 0.015);
             scene.background = new THREE.Color(0x050510);
-            
             // 相机
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 12, 45);
-            
             // 渲染器
-            renderer = new THREE.WebGLRenderer({ 
-                antialias: true, 
-                alpha: true,
-                powerPreference: "high-performance"
-            });
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
             container.appendChild(renderer.domElement);
-            
-            // 轨道控制器
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.autoRotate = true;
-            controls.autoRotateSpeed = 0.5;
-            controls.minDistance = 20;
-            controls.maxDistance = 100;
-            
-            // 灯光系统
+            // 简单控制器（如果OrbitControls加载失败可降级）
+            try {
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 0.3;
+            } catch (e) {
+                console.warn("OrbitControls加载失败，将使用基础控制:", e);
+                // 降级为手动控制
+                window.addEventListener('mousemove', onMouseMove);
+                window.addEventListener('touchmove', onTouchMove);
+            }
+            // 灯光
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
             scene.add(ambientLight);
-            
-            const mainLight = new THREE.DirectionalLight(0xffffff, 0.9);
-            mainLight.position.set(15, 25, 15);
-            mainLight.castShadow = true;
-            mainLight.shadow.mapSize.width = 2048;
-            mainLight.shadow.mapSize.height = 2048;
-            scene.add(mainLight);
-            
-            const fillLight = new THREE.DirectionalLight(0x5599ff, 0.3);
-            fillLight.position.set(-15, 10, -15);
-            scene.add(fillLight);
-            
-            // 地面网格
-            const gridHelper = new THREE.GridHelper(100, 20, 0x444444, 0x222222);
-            gridHelper.position.y = -10;
-            scene.add(gridHelper);
-            
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(10, 20, 10);
+            scene.add(dirLight);
             // 窗口大小调整
-            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('resize', function() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
         }
-        
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+
+        function onMouseMove(event) {
+            if (!controls) {
+                camera.position.x = (event.clientX / window.innerWidth - 0.5) * 20;
+                camera.position.y = 12 - (event.clientY / window.innerHeight) * 10;
+                camera.lookAt(0, 0, 0);
+            }
         }
-        
-        // ========== 2. MMD模型加载 ==========
-        function loadMMDModel(name) {
-            const path = MODELS[name];
-            const loader = new THREE.MMDLoader();
-            
-            // 更新状态
-            document.getElementById('status').innerText = `正在召唤 ${name}...`;
+        function onTouchMove(event) {
+            if (!controls && event.touches.length > 0) {
+                event.preventDefault();
+                const touch = event.touches[0];
+                camera.position.x = (touch.clientX / window.innerWidth - 0.5) * 20;
+                camera.position.y = 12 - (touch.clientY / window.innerHeight) * 10;
+                camera.lookAt(0, 0, 0);
+            }
+        }
+
+        // === 3. 角色模型加载（带降级） ===
+        function loadModel(name) {
+            currentModelName = name;
+            // 更新按钮状态
+            document.querySelectorAll('#control-panel button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${name}`).classList.add('active');
             
             // 移除旧模型
             if (currentModel) {
@@ -349,522 +260,259 @@
                 currentModel = null;
             }
             
-            // 尝试加载PMX模型
-            loader.load(
-                path,
-                function(mesh) {
-                    currentModel = mesh;
-                    currentModelName = name;
-                    
-                    // 调整模型大小和位置
-                    mesh.scale.set(1.8, 1.8, 1.8);
-                    mesh.position.set(15, -8, 0);
-                    mesh.rotation.y = -Math.PI / 6; // 稍微侧身
-                    
-                    // 处理材质 (防止因缺失贴图而变成纯白)
-                    if (mesh.material) {
-                        const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-                        material.emissive = new THREE.Color(0x111111);
-                        material.emissiveIntensity = 0.1;
-                        
-                        // 根据角色设置色调
-                        if (name === 'usagi') material.color.setHex(0xFFEEAA);
-                        else if (name === 'chiikawa') material.color.setHex(0xFFCCDD);
-                        
-                        material.needsUpdate = true;
-                    }
-                    
-                    scene.add(mesh);
-                    document.getElementById('status').innerText = `${name} 已就绪！请尝试手势控制`;
-                    
-                    // 更新按钮状态
-                    updateModelButtons(name);
-                },
-                function(xhr) {
-                    // 加载进度
-                    if (xhr.lengthComputable) {
-                        const percent = Math.round((xhr.loaded / xhr.total) * 100);
-                        document.getElementById('status').innerText = `加载 ${name}: ${percent}%`;
-                    }
-                },
-                function(error) {
-                    console.warn(`模型 ${name} 加载失败:`, error);
-                    createFallbackModel(name); // 使用备用模型
-                }
-            );
+            // 如果存在PMX文件则尝试加载，否则直接使用备用模型
+            const modelFiles = {
+                'hachiware': { color: 0x6495ED, pos: [15, -8, 0] },
+                'usagi': { color: 0xFFD700, pos: [15, -8, -5] },
+                'chiikawa': { color: 0xFF69B4, pos: [15, -8, 5] }
+            };
+            const config = modelFiles[name] || modelFiles.hachiware;
+            
+            createSimpleModel(name, config.color, config.pos);
+            document.getElementById('status').innerText = name + " 已加载！";
         }
-        
-        function createFallbackModel(name) {
-            const color = MODEL_COLORS[name] || 0x888888;
-            
-            // 创建一组简单几何体作为角色
+
+        function createSimpleModel(name, color, position) {
             const group = new THREE.Group();
-            
             // 身体
             const bodyGeo = new THREE.CapsuleGeometry(1.5, 3, 4, 8);
-            const bodyMat = new THREE.MeshStandardMaterial({ 
-                color: color, 
-                roughness: 0.7,
-                emissive: color,
-                emissiveIntensity: 0.1
-            });
+            const bodyMat = new THREE.MeshLambertMaterial({ color: color });
             const body = new THREE.Mesh(bodyGeo, bodyMat);
             body.position.y = 1;
             group.add(body);
-            
             // 头部
             const headGeo = new THREE.SphereGeometry(2, 16, 16);
             const head = new THREE.Mesh(headGeo, bodyMat);
             head.position.y = 4.5;
             group.add(head);
-            
             // 眼睛
             const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
             const eyeGeo = new THREE.SphereGeometry(0.3, 8, 8);
-            
             const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
             eyeL.position.set(-0.6, 4.7, 1.8);
             group.add(eyeL);
-            
             const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
             eyeR.position.set(0.6, 4.7, 1.8);
             group.add(eyeR);
-            
-            group.position.set(15, -8, 0);
+            // 位置和大小
+            group.position.set(...position);
             group.scale.set(1.5, 1.5, 1.5);
-            
             currentModel = group;
-            currentModelName = name;
             scene.add(group);
-            
-            document.getElementById('status').innerText = `${name} (简易版) 已就绪！`;
-            updateModelButtons(name);
+            console.log("✓ 角色模型创建完成:", name);
         }
-        
-        function updateModelButtons(activeName) {
-            document.querySelectorAll('#control-panel button').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            document.getElementById(`btn-${activeName}`).classList.add('active');
-        }
-        
-        // ========== 3. 粒子系统 ==========
+
+        // === 4. 粒子系统 ===
         function createParticles() {
             particleGroup = new THREE.Group();
             scene.add(particleGroup);
-            
-            // 创建粒子纹理 (发光的圆形)
+            // 粒子纹理
             const canvas = document.createElement('canvas');
-            canvas.width = 64; canvas.height = 64;
+            canvas.width = canvas.height = 32;
             const ctx = canvas.getContext('2d');
-            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-            gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.5)');
-            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, 64, 64);
-            
-            const particleTexture = new THREE.CanvasTexture(canvas);
-            
-            // 圣诞主题颜色
-            const colors = [
-                0xFFD700, // 金
-                0xFF0000, // 红
-                0x00FF00, // 绿
-                0x00FFFF, // 青
-                0xFF69B4, // 粉
-                0x9370DB  // 紫
-            ];
-            
+            const gradient = ctx.createRadialGradient(16,16,0, 16,16,16);
+            gradient.addColorStop(0, 'rgba(255,255,255,1)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = gradient; ctx.fillRect(0,0,32,32);
+            const texture = new THREE.CanvasTexture(canvas);
+            // 颜色
+            const colors = [0xFFD700, 0xFF0000, 0x00FF00, 0x00FFFF, 0xFF69B4];
             // 创建粒子
             for (let i = 0; i < PARTICLE_COUNT; i++) {
-                const color = colors[Math.floor(Math.random() * colors.length)];
+                const color = colors[i % colors.length];
                 const material = new THREE.SpriteMaterial({
-                    map: particleTexture,
-                    color: color,
-                    transparent: true,
-                    opacity: 0.9,
-                    blending: THREE.AdditiveBlending,
-                    depthTest: false
+                    map: texture, color: color, transparent: true,
+                    opacity: 0.8, blending: THREE.AdditiveBlending
                 });
-                
                 const sprite = new THREE.Sprite(material);
-                
-                // 初始随机位置
                 sprite.position.set(
-                    (Math.random() - 0.5) * 80,
-                    (Math.random() - 0.5) * 80,
-                    (Math.random() - 0.5) * 80
+                    (Math.random()-0.5)*60,
+                    (Math.random()-0.5)*60,
+                    (Math.random()-0.5)*60
                 );
-                
-                const size = Math.random() * 1.2 + 0.4;
+                const size = Math.random()*1+0.5;
                 sprite.scale.set(size, size, 1);
-                
-                // 计算圣诞树目标位置 (螺旋圆锥)
-                const yNorm = i / PARTICLE_COUNT;
-                const y = yNorm * TREE_HEIGHT - (TREE_HEIGHT / 2);
-                const radius = TREE_RADIUS * (1 - yNorm * 0.8);
-                const angle = i * 0.15;
-                
-                const treePos = new THREE.Vector3(
-                    Math.cos(angle) * radius,
-                    y,
-                    Math.sin(angle) * radius
-                );
-                
+                // 计算圣诞树位置
+                const yNorm = i/PARTICLE_COUNT;
+                const y = yNorm*TREE_HEIGHT - TREE_HEIGHT/2;
+                const r = TREE_RADIUS*(1-yNorm);
+                const angle = i*0.2;
                 particles.push({
                     mesh: sprite,
+                    treePos: new THREE.Vector3(Math.cos(angle)*r, y, Math.sin(angle)*r),
                     initialPos: sprite.position.clone(),
-                    treePos: treePos,
                     fireworkVel: new THREE.Vector3(),
-                    speed: Math.random() * 0.05 + 0.02,
-                    color: color,
-                    size: size
+                    color: color, size: size
                 });
-                
                 particleGroup.add(sprite);
             }
+            console.log("✓ 粒子系统创建完成，数量:", PARTICLE_COUNT);
         }
-        
-        function updateParticles(deltaTime) {
-            const time = Date.now() * 0.001;
-            
+
+        function updateParticles() {
+            const time = Date.now()*0.001;
             particles.forEach(p => {
-                const mesh = p.mesh;
-                const pos = mesh.position;
-                
-                switch(targetShape) {
-                    case 'tree':
-                        // 向圣诞树位置平滑移动
-                        const target = p.treePos.clone();
-                        
-                        // 添加轻微旋转动画
-                        const rotAngle = time * 0.5;
-                        target.applyAxisAngle(new THREE.Vector3(0, 1, 0), rotAngle);
-                        
-                        pos.lerp(target, 0.1);
-                        mesh.material.opacity = THREE.MathUtils.lerp(mesh.material.opacity, 0.9, 0.1);
-                        mesh.scale.setScalar(p.size);
-                        break;
-                        
-                    case 'firework':
-                        // 烟花爆炸效果
-                        if (p.fireworkVel.lengthSq() === 0) {
-                            // 初始化爆炸速度
-                            const angle = Math.random() * Math.PI * 2;
-                            const power = Math.random() * 0.8 + 0.3;
-                            p.fireworkVel.set(
-                                Math.cos(angle) * power,
-                                Math.random() * 0.5 + 0.5,
-                                Math.sin(angle) * power
-                            );
-                        }
-                        
-                        pos.add(p.fireworkVel);
-                        p.fireworkVel.y -= 0.02; // 重力
-                        p.fireworkVel.multiplyScalar(0.98); // 空气阻力
-                        
-                        mesh.material.opacity *= 0.97;
-                        mesh.scale.setScalar(p.size * (0.5 + mesh.material.opacity * 0.5));
-                        
-                        // 重置变得不可见的粒子
-                        if (mesh.material.opacity < 0.05 || pos.length() > 100) {
-                            pos.copy(p.initialPos);
-                            mesh.material.opacity = 1;
-                            p.fireworkVel.set(0, 0, 0);
-                        }
-                        break;
-                        
-                    default: // 'random' 模式
-                        // 随机漂浮动画
-                        const floatX = Math.sin(time * 0.5 + pos.y * 0.1) * 0.05;
-                        const floatY = Math.cos(time * 0.7 + pos.z * 0.1) * 0.05;
-                        const floatZ = Math.sin(time * 0.3 + pos.x * 0.1) * 0.05;
-                        
-                        pos.x += floatX;
-                        pos.y += floatY;
-                        pos.z += floatZ;
-                        
-                        // 缓慢回归初始位置
-                        pos.lerp(p.initialPos, 0.01);
-                        mesh.material.opacity = THREE.MathUtils.lerp(mesh.material.opacity, 0.8, 0.05);
-                        mesh.scale.setScalar(p.size * (0.8 + Math.sin(time + pos.x) * 0.2));
-                        p.fireworkVel.set(0, 0, 0);
-                        break;
+                const mesh = p.mesh, pos = mesh.position;
+                if (targetShape === 'tree') {
+                    // 聚合成树
+                    pos.lerp(p.treePos, 0.08);
+                    mesh.material.opacity += (0.9 - mesh.material.opacity)*0.1;
+                    // 旋转
+                    const rot = time*0.5;
+                    const x = p.treePos.x*Math.cos(rot) - p.treePos.z*Math.sin(rot);
+                    const z = p.treePos.x*Math.sin(rot) + p.treePos.z*Math.cos(rot);
+                    p.treePos.x = x; p.treePos.z = z;
+                } else if (targetShape === 'firework') {
+                    // 烟花爆炸
+                    if (p.fireworkVel.lengthSq() === 0) {
+                        p.fireworkVel.copy(pos).normalize().multiplyScalar(Math.random()*0.5+0.2);
+                        p.fireworkVel.y += Math.random()*0.3;
+                    }
+                    pos.add(p.fireworkVel);
+                    p.fireworkVel.y -= 0.015;
+                    mesh.material.opacity *= 0.97;
+                    // 重置
+                    if (mesh.material.opacity < 0.05) {
+                        pos.copy(p.initialPos);
+                        mesh.material.opacity = 1;
+                        p.fireworkVel.set(0,0,0);
+                    }
+                } else {
+                    // 随机漂浮
+                    pos.x += Math.sin(time+pos.y*0.1)*0.02;
+                    pos.y += Math.cos(time+pos.z*0.1)*0.02;
+                    pos.lerp(p.initialPos, 0.01);
+                    mesh.material.opacity += (0.8 - mesh.material.opacity)*0.05;
+                    p.fireworkVel.set(0,0,0);
                 }
             });
         }
-        
-        // ========== 4. 手势识别系统 ==========
-        async function setupMediaPipe() {
-            try {
-                // 使用全局vision对象 (通过script标签引入)
-                const vision = window.vision;
-                if (!vision) {
-                    throw new Error("MediaPipe Vision库未加载，请检查网络");
-                }
-                
-                const filesetResolver = vision.FilesetResolver;
-                const HandLandmarker = vision.HandLandmarker;
-                
-                // 初始化文件集解析器
-                const visionInstance = await filesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
-                );
-                
-                // 创建手部标记器
-                handLandmarker = await HandLandmarker.createFromOptions(visionInstance, {
-                    baseOptions: {
-                        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-                        delegate: "GPU"
-                    },
-                    runningMode: "VIDEO",
-                    numHands: 1,
-                    minHandDetectionConfidence: 0.5,
-                    minHandPresenceConfidence: 0.5,
-                    minTrackingConfidence: 0.5
-                });
-                
-                console.log("MediaPipe 手势识别初始化成功!");
-                
-                // 启动摄像头
-                await startCamera();
-                
-            } catch (error) {
-                console.error("MediaPipe 初始化失败:", error);
-                document.getElementById('status').innerText = "AI初始化失败，但手动测试功能可用";
-                throw error;
-            }
+
+        // === 5. 手势识别与摄像头 ===
+        async function initHandTracking() {
+            // 动态加载MediaPipe，避免阻塞主线程
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2/wasm/vision_bundle.js';
+                script.onload = async function() {
+                    try {
+                        const vision = window.vision;
+                        if (!vision) reject(new Error("vision对象未定义"));
+                        const filesetResolver = vision.FilesetResolver;
+                        const HandLandmarker = vision.HandLandmarker;
+                        const visionInstance = await filesetResolver.forVisionTasks(
+                            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2/wasm"
+                        );
+                        handLandmarker = await HandLandmarker.createFromOptions(visionInstance, {
+                            baseOptions: {
+                                modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+                                delegate: "GPU"
+                            },
+                            runningMode: "VIDEO",
+                            numHands: 1
+                        });
+                        console.log("✓ MediaPipe 手势识别加载成功");
+                        resolve();
+                    } catch (e) {
+                        reject(e);
+                    }
+                };
+                script.onerror = () => reject(new Error("MediaPipe脚本加载失败"));
+                document.head.appendChild(script);
+            });
         }
-        
-        async function startCamera() {
+
+        window.initCamera = async function() {
             const video = document.getElementById("video-preview");
             const statusEl = document.getElementById('status');
-            
             statusEl.innerText = "正在请求摄像头权限...";
-            
             try {
-                // 检查浏览器支持
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    throw new Error("您的浏览器不支持摄像头访问");
-                }
-                
-                // 获取摄像头权限
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: "user",
-                        width: { ideal: 640 },
-                        height: { ideal: 480 },
-                        frameRate: { ideal: 30 }
-                    },
-                    audio: false
+                    video: { facingMode: "user", width: 480, height: 360 }
                 });
-                
                 video.srcObject = stream;
-                
-                // 等待视频数据就绪
-                await new Promise((resolve) => {
-                    video.onloadeddata = () => resolve();
-                });
-                
+                await new Promise(resolve => video.onloadeddata = resolve);
                 video.play();
                 webcamRunning = true;
-                
                 statusEl.innerText = "摄像头已开启！请尝试手势：✊握拳 或 ✋张手";
-                console.log("摄像头启动成功，视频尺寸:", video.videoWidth, "x", video.videoHeight);
-                
-            } catch (error) {
-                console.error("摄像头启动失败:", error);
-                statusEl.innerText = `摄像头启动失败: ${error.message}`;
-                webcamRunning = false;
+                console.log("✓ 摄像头启动成功");
+                // 开始手势检测循环
+                detectGestureLoop();
+            } catch (err) {
+                statusEl.innerText = "摄像头权限被拒绝，请使用手动测试按钮";
+                console.error("摄像头启动失败:", err);
             }
-        }
-        
-        function detectGesture() {
+        };
+
+        function detectGestureLoop() {
             if (!handLandmarker || !webcamRunning) return;
-            
             const video = document.getElementById("video-preview");
-            
-            // 避免在同一视频帧上重复检测
-            if (video.currentTime === lastVideoTime) return;
-            lastVideoTime = video.currentTime;
-            
             try {
-                // 执行手势检测
                 const results = handLandmarker.detectForVideo(video, performance.now());
-                
                 if (results.landmarks && results.landmarks.length > 0) {
                     isHandDetected = true;
                     const landmarks = results.landmarks[0];
-                    
-                    // 计算手掌中心位置 (用于模型看向手)
+                    // 手掌位置
                     const wrist = landmarks[0];
-                    handPosition.set(
-                        (0.5 - wrist.x) * 40,   // X: -20 到 20
-                        (0.5 - wrist.y) * 30 + 5, // Y: -10 到 20
-                        10
-                    );
-                    
-                    // ===== 改进的手势识别算法 =====
-                    
-                    // 1. 握拳检测：检查指尖是否低于对应的指关节
-                    let fistScore = 0;
-                    const fingerPairs = [
-                        [8, 6],   // 食指：指尖(8) vs 第二关节(6)
-                        [12, 10], // 中指：指尖(12) vs 第二关节(10)
-                        [16, 14], // 无名指：指尖(16) vs 第二关节(14)
-                        [20, 18]  // 小指：指尖(20) vs 第二关节(18)
-                    ];
-                    
-                    fingerPairs.forEach(([tipIdx, jointIdx]) => {
-                        if (landmarks[tipIdx].y > landmarks[jointIdx].y) {
-                            fistScore++; // 指尖在指关节下方 = 弯曲
-                        }
+                    handPosition.set((0.5-wrist.x)*30, (0.5-wrist.y)*20+5, 10);
+                    // 手势识别：计算指尖到掌根的距离
+                    const tips = [8,12,16,20];
+                    let totalDist = 0;
+                    tips.forEach(i => {
+                        const dx = landmarks[i].x - wrist.x;
+                        const dy = landmarks[i].y - wrist.y;
+                        totalDist += Math.sqrt(dx*dx + dy*dy);
                     });
-                    
-                    // 2. 张手检测：计算拇指尖(4)和小指尖(20)之间的距离
-                    const thumbTip = landmarks[4];
-                    const pinkyTip = landmarks[20];
-                    const handSpan = Math.sqrt(
-                        Math.pow(thumbTip.x - pinkyTip.x, 2) + 
-                        Math.pow(thumbTip.y - pinkyTip.y, 2)
-                    );
-                    
-                    // 3. 手势决策
-                    const previousShape = targetShape;
-                    
-                    if (fistScore >= 3) {
-                        // 至少3个手指弯曲 = 握拳
-                        targetShape = 'tree';
-                    } else if (handSpan > 0.35) {
-                        // 手指展开距离大 = 张手
-                        targetShape = 'firework';
-                    } else if (handSpan > 0.15 && handSpan <= 0.35) {
-                        // 中等展开 = 保持原状或切回随机
-                        // targetShape = 'random';
-                    } else {
-                        targetShape = 'random';
-                    }
-                    
-                    // 更新调试信息
-                    document.getElementById('debug-state').textContent = targetShape;
-                    document.getElementById('debug-dist').textContent = handSpan.toFixed(3);
-                    document.getElementById('debug-fist').textContent = fistScore;
-                    document.getElementById('debug-span').textContent = handSpan.toFixed(3);
-                    
-                    // 如果手势状态变化，更新界面提示
-                    if (previousShape !== targetShape) {
-                        const hintMap = {
-                            'tree': '检测到握拳！粒子正在聚集成圣诞树...',
-                            'firework': '检测到张手！粒子烟花即将绽放...',
-                            'random': '手势已释放，粒子恢复自由漂浮'
-                        };
-                        if (hintMap[targetShape]) {
-                            document.getElementById('status').innerText = hintMap[targetShape];
-                        }
-                    }
-                    
+                    const avgDist = totalDist/tips.length;
+                    // 决策
+                    if (avgDist < 0.2) targetShape = 'tree';
+                    else if (avgDist > 0.3) targetShape = 'firework';
+                    // else targetShape = 'random'; // 可保持原状
                 } else {
-                    // 未检测到手部
                     isHandDetected = false;
-                    targetShape = 'random';
-                    document.getElementById('debug-state').textContent = '未检测';
                 }
-                
-            } catch (error) {
-                console.warn("手势检测过程中出错:", error);
-                isHandDetected = false;
+            } catch (e) {
+                // 忽略单次检测错误
             }
+            requestAnimationFrame(detectGestureLoop);
         }
-        
-        // ========== 5. 动画与模型控制 ==========
+
+        // === 6. 动画循环与模型控制 ===
         function animate() {
             requestAnimationFrame(animate);
-            const deltaTime = clock.getDelta();
-            
-            // 手势检测
-            detectGesture();
-            
-            // 更新粒子系统
-            updateParticles(deltaTime);
-            
-            // 更新角色模型
-            updateModelAnimation(deltaTime);
-            
-            // 更新控制器和渲染
-            controls.update();
-            renderer.render(scene, camera);
-        }
-        
-        function updateModelAnimation(deltaTime) {
-            if (!currentModel) return;
-            
-            // 计算模型看向的目标点
-            const modelWorldPos = new THREE.Vector3();
-            currentModel.getWorldPosition(modelWorldPos);
-            
-            // 创建看向目标
-            const lookTarget = new THREE.Vector3();
-            
-            if (isHandDetected) {
-                // 有手部检测时，让模型看向手的位置
-                lookTarget.copy(handPosition);
-                lookTarget.x += 15; // 补偿模型偏移
-                lookTarget.y += 5;
-                
-                // 限制头部旋转，避免过度扭曲
-                const maxRotation = Math.PI / 4; // 45度
-                currentModel.lookAt(lookTarget);
-                
-                // 限制Y轴旋转范围
-                if (Math.abs(currentModel.rotation.y) > maxRotation) {
-                    currentModel.rotation.y = Math.sign(currentModel.rotation.y) * maxRotation;
-                }
-                
-                // 根据手势添加动画
+            updateParticles();
+            // 模型看向手部
+            if (currentModel && isHandDetected) {
+                currentModel.lookAt(handPosition.x+15, handPosition.y, 10);
                 if (targetShape === 'tree') {
-                    // 握拳时跳跃
-                    const jumpHeight = Math.sin(Date.now() * 0.005) * 2;
-                    currentModel.position.y = -8 + jumpHeight;
-                } else if (targetShape === 'firework') {
-                    // 张手时兴奋地小幅度跳动
-                    const bounce = Math.sin(Date.now() * 0.01) * 0.5;
-                    currentModel.position.y = -8 + bounce;
+                    currentModel.position.y = -8 + Math.abs(Math.sin(Date.now()*0.005))*2;
                 } else {
                     currentModel.position.y = -8;
                 }
-                
-            } else {
-                // 无手部检测时，缓慢回到默认姿态
-                currentModel.rotation.y = THREE.MathUtils.lerp(currentModel.rotation.y, 0, 0.05);
-                currentModel.rotation.x = THREE.MathUtils.lerp(currentModel.rotation.x, 0, 0.05);
-                currentModel.position.y = THREE.MathUtils.lerp(currentModel.position.y, -8, 0.1);
             }
+            if (controls) controls.update();
+            renderer.render(scene, camera);
         }
-        
-        // ========== 6. 全局函数 (供HTML按钮调用) ==========
-        window.switchModel = function(name) {
-            if (currentModelName === name) return;
-            loadMMDModel(name);
-        };
-        
+
+        // === 7. 全局控制函数 ===
+        window.switchModel = loadModel;
         window.forceShape = function(shape) {
             targetShape = shape;
             const msg = {
                 'tree': '手动模式：圣诞树',
-                'firework': '手动模式：烟花绽放',
+                'firework': '手动模式：烟花',
                 'random': '手动模式：自由漂浮'
             }[shape] || '手动控制';
-            
             document.getElementById('status').innerText = msg;
-            console.log('手动切换粒子状态为:', shape);
+            console.log('手动切换状态:', shape);
         };
-        
-        // 重新导出startCamera供按钮调用
-        window.startCamera = startCamera;
-        
-        // 初始化完成提示
-        console.log("吉依卡哇互动页面初始化完成！");
+
+        // 控制台提示
+        console.log("🎮 控制说明：");
+        console.log("1. 点击「启动摄像头」开启手势识别");
+        console.log("2. 使用三个按钮切换角色模型");
+        console.log("3. 使用「测试」按钮手动控制粒子效果");
+        console.log("4. 在微信中，可能需要手动点击页面以激活摄像头");
     </script>
 </body>
 </html>
