@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Christmas Interactive</title>
+    <title>Christmas Magic</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #050505; font-family: "Helvetica Neue", sans-serif; }
         #container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
@@ -23,41 +23,14 @@
             text-shadow: 0 0 10px rgba(255,255,255,0.3);
             z-index: 10;
             pointer-events: none;
+            transition: opacity 0.3s;
         }
 
-        /* 3. OK 手势弹窗 */
-        #message-box {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%;
-            max-width: 300px;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.5);
-            border-radius: 15px;
-            color: #fff;
-            font-size: 1.2rem;
-            text-align: center;
-            box-shadow: 0 0 20px rgba(255,215,0, 0.3);
-            display: none; /* 默认隐藏 */
-            z-index: 30;
-            animation: popIn 0.3s ease-out;
-        }
-
-        @keyframes popIn {
-            from { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
-            to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-        }
-
-        /* iOS 启动遮罩层 */
+        /* 2. 启动遮罩 (iOS 必需 & 加载状态) */
         #start-overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.95);
             z-index: 100;
             display: flex;
             flex-direction: column;
@@ -65,91 +38,117 @@
             align-items: center;
             color: white;
             text-align: center;
+            transition: opacity 0.5s;
         }
+        #loading-text { margin-bottom: 20px; color: #aaa; font-size: 14px; }
         #start-btn {
             padding: 15px 40px;
-            margin-top: 20px;
             font-size: 1.2rem;
-            background: #ff4757;
+            background: #444; /* 初始灰色 */
             border: none;
             border-radius: 30px;
+            color: #888;
+            cursor: not-allowed;
+            box-shadow: none;
+            transition: all 0.3s;
+        }
+        #start-btn.ready {
+            background: #ff4757;
             color: white;
             cursor: pointer;
-            box-shadow: 0 0 15px #ff4757;
+            box-shadow: 0 0 20px #ff4757;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
 
-        /* 底部 UI */
-        #ui-layer {
+        /* 3. OK 手势弹窗 */
+        #message-box {
             position: absolute;
-            bottom: 30px;
-            left: 0;
-            width: 100%;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%; max-width: 300px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 15px;
+            color: #fff;
+            font-size: 1.2rem;
             text-align: center;
-            z-index: 10;
-            pointer-events: none;
+            box-shadow: 0 0 30px rgba(255,215,0, 0.4);
+            display: none; 
+            z-index: 30;
+        }
+
+        /* 4. 底部 UI */
+        #ui-layer {
+            position: absolute; bottom: 30px; left: 0; width: 100%;
+            text-align: center; z-index: 10; pointer-events: none;
         }
         .btn-group {
             pointer-events: auto;
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(5px);
-            padding: 10px;
-            border-radius: 20px;
+            padding: 10px; border-radius: 20px;
             display: inline-block;
         }
-        button {
+        button.model-btn {
             background: rgba(0, 0, 0, 0.5);
             color: white;
             border: 1px solid rgba(255,255,255,0.3);
-            padding: 8px 15px;
-            margin: 0 5px;
-            border-radius: 12px;
-            font-size: 14px;
+            padding: 8px 15px; margin: 0 5px;
+            border-radius: 12px; font-size: 14px;
         }
-        button.active { background: #ff4757; border-color: #ff4757; }
+        button.model-btn.active { background: #ff4757; border-color: #ff4757; }
 
-        /* 调试/状态文字 */
-        #status-text {
-            position: absolute;
-            top: 10px; left: 10px;
-            color: rgba(255,255,255,0.5);
-            font-size: 10px;
-            z-index: 5;
-        }
-
-        /* 视频源 (iOS 必须设为可见但透明) */
+        /* 5. 隐藏视频源 (保持透明但占位) */
         #video-preview {
-            position: absolute;
-            top: 0; left: 0;
+            position: absolute; top: 0; left: 0;
             width: 1px; height: 1px;
-            opacity: 0;
-            pointer-events: none;
+            opacity: 0.01; pointer-events: none;
             transform: scaleX(-1);
+        }
+
+        /* 调试信息 */
+        #debug {
+            position: absolute; top: 5px; left: 5px;
+            color: rgba(255,255,255,0.3); font-size: 10px; z-index: 5;
         }
     </style>
 </head>
 <body>
 
     <div id="start-overlay">
-        <h1>🎄 圣诞互动</h1>
-        <p>需要摄像头权限</p>
-        <button id="start-btn">点击开始体验</button>
+        <h1 style="margin-bottom: 10px;">🎄 圣诞奇迹</h1>
+        <div id="loading-text">正在初始化资源...</div>
+        <button id="start-btn" disabled>加载中...</button>
+        <p style="font-size: 10px; color: #666; margin-top: 20px; max-width: 80%;">
+            若长时间无反应，请检查网络或使用 HTTPS
+        </p>
     </div>
 
     <div id="top-title">mm, Happy Christmas</div>
+    <div id="debug">系统就绪</div>
     
     <div id="message-box">
-        ✨ 平安夜快乐！✨<br>
-        <span style="font-size:0.8em; opacity:0.8;">今晚一起吃苹果吗？</span>
+        ✨ 圣诞快乐！✨<br>
+        <span style="font-size:0.8em; opacity:0.9; margin-top:5px; display:block;">
+            这是属于你的魔法时刻<br>愿你今晚好梦
+        </span>
     </div>
 
-    <div id="status-text">等待启动...</div>
     <video id="video-preview" playsinline webkit-playsinline muted autoplay></video>
 
     <div id="ui-layer">
         <div class="btn-group">
-            <button onclick="switchModel('hachiware')" id="btn-hachiware" class="active">小八</button>
-            <button onclick="switchModel('usagi')" id="btn-usagi">乌萨奇</button>
-            <button onclick="switchModel('chiikawa')" id="btn-chiikawa">吉依卡哇</button>
+            <button onclick="switchModel('hachiware')" id="btn-hachiware" class="model-btn active">小八</button>
+            <button onclick="switchModel('usagi')" id="btn-usagi" class="model-btn">乌萨奇</button>
+            <button onclick="switchModel('chiikawa')" id="btn-chiikawa" class="model-btn">吉依卡哇</button>
         </div>
     </div>
 
@@ -168,246 +167,108 @@
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { MMDLoader } from 'three/addons/loaders/MMDLoader.js';
-        import { CCDIKSolver, MMDPhysics } from 'three/addons/animation/MMDPhysics.js';
         import { FilesetResolver, HandLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/+esm';
 
         // --- 核心变量 ---
         let scene, camera, renderer, controls;
         let particles = [], particleGroup, starMesh;
-        let currentModel = null, ikSolver;
+        let currentModel = null;
         let currentModelName = 'hachiware';
         
-        // 状态
+        // 状态变量
         let targetShape = 'random'; 
-        let isHandDetected = false;
         let handPosition = new THREE.Vector3(0, 0, 0); 
+        let previousHandX = 0; // 用于计算扇动速度
+        let sceneRotationVelocity = 0; // 场景旋转惯性
+
         let handClenchLevel = 0; // 0=张开, 1=握拳
-        
+        let isHandDetected = false;
+
         // 参数
         const TREE_HEIGHT = 22;
         const TREE_RADIUS = 9;
-        const PARTICLE_COUNT = 1200; 
-
-        // 模型映射
+        const PARTICLE_COUNT = 1500; 
         const MODELS = {
             'hachiware': './hachiware.pmx',
             'usagi': './usagi.pmx',
             'chiikawa': './chiikawa.pmx'
         };
 
-        // --- 1. 启动逻辑 (iOS Fix) ---
+        // DOM
+        const loadingText = document.getElementById('loading-text');
         const startBtn = document.getElementById('start-btn');
+        const debug = document.getElementById('debug');
+
+        // --- 1. 程序入口：先加载，后交互 ---
+        init3D(); // 立即加载3D场景
+        preloadAI(); // 立即开始下载AI模型
+
+        // 按钮点击事件 (解锁摄像头)
         startBtn.addEventListener('click', async () => {
-            document.getElementById('start-overlay').style.display = 'none';
-            // 必须在点击事件中初始化 AudioContext (如果有) 和 Video
-            await init();
+            if (startBtn.disabled) return;
+            
+            startBtn.innerText = "启动摄像头...";
+            try {
+                await startCamera();
+                // 成功后隐藏遮罩
+                const overlay = document.getElementById('start-overlay');
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.style.display = 'none', 500);
+                animate(); // 开始渲染循环
+            } catch (err) {
+                alert("摄像头启动失败，请检查权限: " + err);
+                startBtn.innerText = "重试";
+            }
         });
 
-        async function init() {
-            setupScene();
-            createParticles();
-            createStar(); // 圣诞树顶部的星星
-            loadMMDModel('hachiware');
-
-            // 全局切换
-            window.switchModel = (name) => {
-                if (currentModelName === name) return;
-                currentModelName = name;
-                document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-                document.getElementById(`btn-${name}`).classList.add('active');
-                loadMMDModel(name);
-            };
-
-            await setupMediaPipe();
-            animate();
-        }
-
-        // --- 2. 场景 ---
-        function setupScene() {
+        // --- 2. 场景初始化 ---
+        function init3D() {
+            const container = document.getElementById('container');
             scene = new THREE.Scene();
             scene.fog = new THREE.FogExp2(0x050505, 0.02);
+
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 5, 45);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            document.getElementById('container').appendChild(renderer.domElement);
+            container.appendChild(renderer.domElement);
 
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.autoRotate = true;
-            controls.autoRotateSpeed = 0.5;
+            controls.autoRotateSpeed = 1.0; 
 
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-            scene.add(ambientLight);
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-            dirLight.position.set(10, 20, 20);
-            scene.add(dirLight);
+            // 灯光
+            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+            const dl = new THREE.DirectionalLight(0xffffff, 1.2);
+            dl.position.set(10, 20, 20);
+            scene.add(dl);
+
+            createParticles();
+            createStar();
+            loadMMDModel('hachiware');
+
+            window.switchModel = (name) => {
+                if (currentModelName === name) return;
+                currentModelName = name;
+                document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+                document.getElementById(`btn-${name}`).classList.add('active');
+                loadMMDModel(name);
+            };
         }
 
-        // --- 3. 粒子系统 (绚丽版) ---
-        function createParticles() {
-            particleGroup = new THREE.Group();
-            scene.add(particleGroup);
-
-            const loader = new THREE.TextureLoader();
-            // 使用 Canvas 生成辉光贴图
-            const canvas = document.createElement('canvas');
-            canvas.width = 32; canvas.height = 32;
-            const ctx = canvas.getContext('2d');
-            const grad = ctx.createRadialGradient(16,16,0, 16,16,16);
-            grad.addColorStop(0, 'rgba(255,255,255,1)');
-            grad.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0,0,32,32);
-            const texture = new THREE.CanvasTexture(canvas);
-
-            for (let i = 0; i < PARTICLE_COUNT; i++) {
-                // 颜色和大小逻辑
-                // 金色: 0xFFD700, 绿色: 0x2ED573, 红色: 0xFF4757
-                let color, size;
-                const rand = Math.random();
-
-                if (rand < 0.16) { 
-                    // 1/6 红色大粒子
-                    color = 0xFF4757; size = 1.2;
-                } else if (rand < 0.32) {
-                    // 1/6 绿色大粒子
-                    color = 0x2ED573; size = 1.2;
-                } else {
-                    // 剩余 金色粒子
-                    color = 0xFFD700; size = 0.7;
-                }
-
-                const material = new THREE.SpriteMaterial({ 
-                    map: texture, 
-                    color: color,
-                    transparent: true,
-                    opacity: 0.9,
-                    blending: THREE.AdditiveBlending
-                });
-                
-                const sprite = new THREE.Sprite(material);
-                sprite.position.set((Math.random()-0.5)*60, (Math.random()-0.5)*60, (Math.random()-0.5)*60);
-                sprite.scale.set(size, size, 1);
-
-                // 树形态计算
-                const yNorm = i / PARTICLE_COUNT; 
-                const y = yNorm * TREE_HEIGHT - (TREE_HEIGHT / 2); 
-                const r = TREE_RADIUS * (1 - yNorm); // 锥形
-                const angle = i * 0.3; // 螺旋密度
-
-                const pData = {
-                    mesh: sprite,
-                    initialPos: sprite.position.clone(),
-                    treePos: new THREE.Vector3(Math.cos(angle)*r, y, Math.sin(angle)*r),
-                    fireworkVel: new THREE.Vector3(),
-                    baseScale: size
-                };
-                particles.push(pData);
-                particleGroup.add(sprite);
-            }
-        }
-
-        function createStar() {
-            // 圣诞树顶的星星
-            const geo = new THREE.OctahedronGeometry(1.5, 0);
-            const mat = new THREE.MeshBasicMaterial({ color: 0xFFFF00, wireframe: true });
-            starMesh = new THREE.Mesh(geo, mat);
-            starMesh.position.set(0, TREE_HEIGHT/2 + 1, 0);
-            starMesh.visible = false;
-            scene.add(starMesh);
-            
-            // 内部发光球
-            const glowGeo = new THREE.SphereGeometry(0.8);
-            const glowMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
-            starMesh.add(new THREE.Mesh(glowGeo, glowMat));
-        }
-
-        // --- 4. 模型加载与骨骼控制 ---
-        function loadMMDModel(name) {
-            const path = MODELS[name];
-            const loader = new MMDLoader();
-            
-            if (currentModel) {
-                scene.remove(currentModel);
-                currentModel = null;
-            }
-
-            loader.load(path, (mesh) => {
-                currentModel = mesh;
-                mesh.scale.set(1.5, 1.5, 1.5);
-                mesh.position.set(12, -10, 0);
-                
-                // 防止全黑
-                mesh.material.forEach(mat => {
-                    mat.emissive = new THREE.Color(0x333333);
-                    if(name === 'usagi') mat.color.setHex(0xFFEEAA);
-                    if(name === 'hachiware') mat.color.setHex(0xDDEEFF);
-                });
-
-                scene.add(mesh);
-            }, undefined, (err) => {
-                console.error(err);
-                // 失败回退
-                const geo = new THREE.CapsuleGeometry(2, 4);
-                currentModel = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color:0xffffff}));
-                currentModel.position.set(12, -8, 0);
-                scene.add(currentModel);
-            });
-        }
-
-        function updateCharacterBone() {
-            if (!currentModel || !currentModel.skeleton) return;
-
-            // MMD 骨骼名称通常是日语: 左腕 (Left Arm), 右腕 (Right Arm)
-            // 根据握拳程度 (handClenchLevel: 0~1) 控制手臂旋转
-            // 0(张开): 手臂放下或张开
-            // 1(握拳): 手臂向前合拢 (抱树动作)
-
-            const skeleton = currentModel.skeleton;
-            const bones = skeleton.bones;
-            
-            // 查找骨骼 (简单名称匹配)
-            const armL = bones.find(b => b.name === '左腕');
-            const armR = bones.find(b => b.name === '右腕');
-
-            if (armL && armR) {
-                // 简单的欧拉角插值
-                // 原始/张开状态 (Z轴旋转)
-                const openRotZ = -0.8; // 垂下/张开
-                const closeRotZ = 0.5; // 抬起/向内
-
-                // 向前旋转 (X轴)
-                const openRotX = 0;
-                const closeRotX = -0.5;
-
-                // 计算当前目标旋转
-                const currentZ_L = THREE.MathUtils.lerp(openRotZ, closeRotZ, handClenchLevel);
-                const currentZ_R = THREE.MathUtils.lerp(-openRotZ, -closeRotZ, handClenchLevel); // 镜像
-                
-                const currentX = THREE.MathUtils.lerp(openRotX, closeRotX, handClenchLevel);
-
-                // 应用旋转
-                armL.rotation.z = currentZ_L;
-                armL.rotation.x = currentX;
-                
-                armR.rotation.z = currentZ_R;
-                armR.rotation.x = currentX;
-            }
-        }
-
-        // --- 5. AI 手势识别 (含 OK 判断) ---
+        // --- 3. 预加载 AI (关键修复点) ---
         let handLandmarker;
-        let lastVideoTime = -1;
-        
-        async function setupMediaPipe() {
+        async function preloadAI() {
             try {
-                document.getElementById('status-text').innerText = "加载 AI 模型...";
+                loadingText.innerText = "正在下载 AI 识别模型 (约10MB)...";
+                
                 const vision = await FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
                 );
+                
                 handLandmarker = await HandLandmarker.createFromOptions(vision, {
                     baseOptions: {
                         modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
@@ -416,172 +277,279 @@
                     runningMode: "VIDEO",
                     numHands: 1
                 });
-                startCamera();
+
+                // AI 加载完毕，激活按钮
+                loadingText.innerText = "资源准备就绪";
+                startBtn.disabled = false;
+                startBtn.classList.add('ready');
+                startBtn.innerText = "点击开始体验";
+
             } catch (e) {
-                alert("模型加载失败: " + e);
+                loadingText.innerText = "AI 模型加载失败，请刷新重试";
+                loadingText.style.color = "red";
+                console.error(e);
+                debug.innerText = "Error: " + e.message;
             }
         }
 
+        // --- 4. 摄像头启动 ---
         async function startCamera() {
             const video = document.getElementById("video-preview");
-            try {
-                // 强制前置
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user", width: 640, height: 480 } 
-                });
-                video.srcObject = stream;
-                video.addEventListener("loadeddata", () => {
+            // 强制前置，兼容性写法
+            const constraints = { 
+                video: { 
+                    facingMode: "user", 
+                    width: { ideal: 640 }, 
+                    height: { ideal: 480 } 
+                },
+                audio: false
+            };
+
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = stream;
+            
+            return new Promise((resolve) => {
+                video.onloadeddata = () => {
                     video.play();
-                    document.getElementById('status-text').innerText = "运行中";
+                    resolve();
+                };
+            });
+        }
+
+        // --- 5. 粒子特效 (金色为主+红绿点缀) ---
+        function createParticles() {
+            particleGroup = new THREE.Group();
+            scene.add(particleGroup);
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 32; canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(16,16,0, 16,16,16);
+            grad.addColorStop(0, 'rgba(255,255,255,1)');
+            grad.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0,0,32,32);
+            const tex = new THREE.CanvasTexture(canvas);
+
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                let color, size;
+                const r = Math.random();
+                if (r < 0.15) { color = 0xFF4757; size = 1.0; } // 红
+                else if (r < 0.30) { color = 0x2ED573; size = 1.0; } // 绿
+                else { color = 0xFFD700; size = 0.6; } // 金 (默认)
+
+                const mat = new THREE.SpriteMaterial({ 
+                    map: tex, color: color, 
+                    transparent: true, opacity: 0.8, 
+                    blending: THREE.AdditiveBlending 
                 });
-            } catch (err) {
-                alert("摄像头启动失败 (请确保使用HTTPS): " + err);
+                const mesh = new THREE.Sprite(mat);
+                mesh.position.set((Math.random()-0.5)*60, (Math.random()-0.5)*60, (Math.random()-0.5)*60);
+                mesh.scale.set(size, size, 1);
+
+                // 树形态
+                const yNorm = i / PARTICLE_COUNT; 
+                const y = yNorm * TREE_HEIGHT - (TREE_HEIGHT / 2); 
+                const rad = TREE_RADIUS * (1 - yNorm); 
+                const ang = i * 0.3;
+
+                particles.push({
+                    mesh: mesh,
+                    initialPos: mesh.position.clone(),
+                    treePos: new THREE.Vector3(Math.cos(ang)*rad, y, Math.sin(ang)*rad),
+                    fireworkVel: new THREE.Vector3(),
+                    baseScale: size
+                });
+                particleGroup.add(mesh);
             }
         }
 
+        function createStar() {
+            const geo = new THREE.OctahedronGeometry(1.5, 0);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xFFFF00, wireframe: true });
+            starMesh = new THREE.Mesh(geo, mat);
+            // 内部发光
+            starMesh.add(new THREE.Mesh(new THREE.SphereGeometry(0.8), new THREE.MeshBasicMaterial({color:0xFFFFFF})));
+            starMesh.visible = false;
+            scene.add(starMesh);
+        }
+
+        // --- 6. 模型与骨骼 ---
+        function loadMMDModel(name) {
+            const path = MODELS[name];
+            new MMDLoader().load(path, (mesh) => {
+                if (currentModel) scene.remove(currentModel);
+                currentModel = mesh;
+                mesh.scale.set(1.5, 1.5, 1.5);
+                mesh.position.set(12, -10, 0);
+                
+                mesh.material.forEach(m => {
+                    m.emissive = new THREE.Color(0x444444);
+                    if(name==='usagi') m.color.setHex(0xFFEEAA);
+                    if(name==='hachiware') m.color.setHex(0xDDEEFF);
+                });
+                scene.add(mesh);
+            }, null, (err) => { 
+                console.error(err);
+                debug.innerText = "模型加载失败";
+            });
+        }
+
+        function updateBone() {
+            if(!currentModel || !currentModel.skeleton) return;
+            const bones = currentModel.skeleton.bones;
+            const armL = bones.find(b => b.name === '左腕');
+            const armR = bones.find(b => b.name === '右腕');
+            
+            if(armL && armR) {
+                // 根据握拳度平滑插值动作
+                const z = THREE.MathUtils.lerp(-0.8, 0.5, handClenchLevel);
+                const x = THREE.MathUtils.lerp(0, -0.6, handClenchLevel);
+                armL.rotation.z = z; armL.rotation.x = x;
+                armR.rotation.z = -z; armR.rotation.x = x;
+            }
+        }
+
+        // --- 7. 手势侦测循环 ---
+        let lastVideoTime = -1;
         function detectGesture() {
             const video = document.getElementById("video-preview");
-            if (!handLandmarker || !video.srcObject) return;
+            if (!handLandmarker || !video || video.paused) return;
 
             if (video.currentTime !== lastVideoTime) {
                 lastVideoTime = video.currentTime;
-                const results = handLandmarker.detectForVideo(video, performance.now());
+                const res = handLandmarker.detectForVideo(video, performance.now());
                 
                 const msgBox = document.getElementById('message-box');
                 const title = document.getElementById('top-title');
 
-                if (results.landmarks && results.landmarks.length > 0) {
+                if (res.landmarks && res.landmarks.length > 0) {
                     isHandDetected = true;
-                    const lm = results.landmarks[0];
-                    
-                    // 坐标映射
-                    handPosition.set((0.5 - lm[0].x) * 40, (0.5 - lm[0].y) * 30, 10);
-
-                    // 1. 计算握拳程度 (0~1) 用于动画平滑过渡
+                    const lm = res.landmarks[0];
                     const wrist = lm[0];
-                    const tips = [8, 12, 16, 20];
-                    let avgDist = 0;
-                    tips.forEach(i => {
-                        avgDist += Math.sqrt(Math.pow(lm[i].x-wrist.x, 2) + Math.pow(lm[i].y-wrist.y, 2));
-                    });
-                    avgDist /= 4;
-                    
-                    // 映射距离到 0-1 (0.2=紧握, 0.4=全张)
-                    // clenchLevel: 1 = Fist, 0 = Open
-                    let rawClench = THREE.MathUtils.mapLinear(avgDist, 0.4, 0.2, 0, 1);
-                    rawClench = THREE.MathUtils.clamp(rawClench, 0, 1);
-                    // 平滑处理
-                    handClenchLevel += (rawClench - handClenchLevel) * 0.1;
 
-                    // 2. 状态判断
-                    if (handClenchLevel > 0.7) {
-                        targetShape = 'tree';
-                        msgBox.style.display = 'none';
-                    } else if (handClenchLevel < 0.3) {
-                        targetShape = 'firework';
-                        msgBox.style.display = 'none';
+                    // 坐标映射
+                    const rawX = (0.5 - wrist.x); // -0.5 ~ 0.5
+                    handPosition.set(rawX * 40, (0.5 - wrist.y) * 30, 10);
+
+                    // --- 计算扇动 (Fanning) 逻辑 ---
+                    if (targetShape === 'firework') { // 只有张手时才生效
+                        // 计算当前帧与上一帧手部X坐标的差值 (速度)
+                        const deltaX = rawX - previousHandX;
+                        // 如果速度够快，且手掌张开，则旋转场景
+                        if (Math.abs(deltaX) > 0.015) {
+                            // 累加旋转速度 (反向使得更自然：手往左划，场景往右转)
+                            sceneRotationVelocity += deltaX * 1.5; 
+                        }
                     }
+                    previousHandX = rawX;
 
-                    // 3. OK 手势判定
-                    // 逻辑: 拇指尖(4)与食指尖(8)距离很近，且中指(12)伸直(离掌心远)
-                    const thumbTip = lm[4];
-                    const indexTip = lm[8];
-                    const middleTip = lm[12];
+                    // 计算握拳度
+                    const tips = [8,12,16,20];
+                    let dist = 0;
+                    tips.forEach(i => dist += Math.sqrt(Math.pow(lm[i].x-wrist.x,2) + Math.pow(lm[i].y-wrist.y,2)));
+                    dist /= 4; 
                     
-                    const pinchDist = Math.sqrt(Math.pow(thumbTip.x - indexTip.x, 2) + Math.pow(thumbTip.y - indexTip.y, 2));
-                    const middleDist = Math.sqrt(Math.pow(middleTip.x - wrist.x, 2) + Math.pow(middleTip.y - wrist.y, 2));
+                    let targetClench = THREE.MathUtils.mapLinear(dist, 0.4, 0.2, 0, 1);
+                    targetClench = THREE.MathUtils.clamp(targetClench, 0, 1);
+                    handClenchLevel += (targetClench - handClenchLevel) * 0.1;
 
-                    // 阈值: 捏合<0.05 且 中指伸展>0.3
-                    if (pinchDist < 0.06 && middleDist > 0.3) {
-                        targetShape = 'random'; // 暂停其他特效
-                        msgBox.style.display = 'block'; // 显示文字框
-                        title.style.opacity = 0.2; // 标题变淡
+                    // 状态机
+                    if (handClenchLevel > 0.7) targetShape = 'tree';
+                    else if (handClenchLevel < 0.3) targetShape = 'firework';
+
+                    // OK 手势 (拇指+食指捏合, 中指伸直)
+                    const pinch = Math.sqrt(Math.pow(lm[4].x-lm[8].x,2) + Math.pow(lm[4].y-lm[8].y,2));
+                    const middle = Math.sqrt(Math.pow(lm[12].x-wrist.x,2) + Math.pow(lm[12].y-wrist.y,2));
+                    
+                    if (pinch < 0.06 && middle > 0.3) {
+                        msgBox.style.display = 'block';
+                        title.style.opacity = 0.1;
                     } else {
-                        // 只有在非OK状态才恢复标题
+                        msgBox.style.display = 'none';
                         title.style.opacity = 1;
                     }
 
                 } else {
                     isHandDetected = false;
-                    handClenchLevel = 0; // 无手时默认张开
+                    handClenchLevel = 0;
                     targetShape = 'random';
                 }
             }
         }
 
-        // --- 6. 动画 ---
+        // --- 8. 动画渲染 ---
         function animate() {
             requestAnimationFrame(animate);
             detectGesture();
             
             const time = Date.now() * 0.001;
 
-            // 粒子动画
+            // 应用场景扇动旋转
+            if (Math.abs(sceneRotationVelocity) > 0.001) {
+                scene.rotation.y += sceneRotationVelocity;
+                sceneRotationVelocity *= 0.95; // 阻尼衰减，让旋转慢慢停下
+            } else {
+                // 如果没有手动旋转，恢复自动缓慢旋转
+                scene.rotation.y += 0.002;
+            }
+
+            // 粒子逻辑
             particles.forEach(p => {
-                const current = p.mesh.position;
+                const cur = p.mesh.position;
                 
-                // 星星显示逻辑
-                if (starMesh) {
-                    starMesh.visible = (targetShape === 'tree' && handClenchLevel > 0.8);
+                // 星星跟随
+                if(starMesh) {
+                    starMesh.visible = (targetShape==='tree' && handClenchLevel>0.8);
                     starMesh.rotation.y += 0.05;
-                    // 让星星跟随树顶晃动
                     starMesh.position.y = TREE_HEIGHT/2 + 3 + Math.sin(time*3)*0.5;
                 }
 
                 if (targetShape === 'tree') {
-                    // 握拳: 聚拢
-                    current.lerp(p.treePos, 0.08);
-                    // 树整体旋转 + 螺旋
-                    const spin = 0.5 * time; 
-                    const x = p.treePos.x * Math.cos(spin) - p.treePos.z * Math.sin(spin);
-                    const z = p.treePos.x * Math.sin(spin) + p.treePos.z * Math.cos(spin);
-                    // 叠加 current 的 lerp，这里简单处理，实际上应该lerp到动态的treePos
-                    // 为了简化，我们只做微调
-                    p.mesh.position.y += Math.sin(time * 3 + current.x) * 0.02;
-                    
+                    cur.lerp(p.treePos, 0.08);
+                    // 螺旋上升
+                    const s = 0.5 * time;
+                    const x = p.treePos.x*Math.cos(s) - p.treePos.z*Math.sin(s);
+                    const z = p.treePos.x*Math.sin(s) + p.treePos.z*Math.cos(s);
+                    // 简易覆盖
+                    p.mesh.position.y += Math.sin(time*3 + cur.x)*0.02;
+
                 } else if (targetShape === 'firework') {
-                    // 张手: 烟花
-                    if (p.fireworkVel.lengthSq() === 0) {
-                        p.fireworkVel.copy(current).normalize().multiplyScalar(Math.random()*0.8 + 0.3);
+                    if(p.fireworkVel.lengthSq()===0) {
+                        p.fireworkVel.copy(cur).normalize().multiplyScalar(Math.random()*0.8+0.2);
                         p.fireworkVel.y += 0.15;
                     }
-                    current.add(p.fireworkVel);
+                    cur.add(p.fireworkVel);
                     p.fireworkVel.y -= 0.01;
-                    p.mesh.material.opacity -= 0.02;
-                    if (p.mesh.material.opacity <= 0) {
+                    p.mesh.material.opacity -= 0.015;
+                    if(p.mesh.material.opacity<=0) {
                         p.mesh.position.set(0,0,0);
                         p.mesh.material.opacity = 1;
                         p.fireworkVel.set(0,0,0);
                     }
                 } else {
-                    // 默认/OK状态
-                    current.y += Math.sin(time + current.x) * 0.02;
-                    current.lerp(p.initialPos, 0.05);
+                    cur.y += Math.sin(time+cur.x)*0.02;
+                    cur.lerp(p.initialPos, 0.05);
                     p.mesh.material.opacity = 1;
                     p.fireworkVel.set(0,0,0);
                 }
             });
 
-            // 人物动画
-            if (currentModel) {
-                // 手臂动作 (基于 handClenchLevel)
-                updateCharacterBone();
-
-                // 头部跟随
-                if (isHandDetected) {
-                    const lookPos = handPosition.clone();
-                    lookPos.x += 12; 
-                    currentModel.lookAt(lookPos);
+            // 模型更新
+            if(currentModel) {
+                updateBone();
+                if(isHandDetected) {
+                    const target = handPosition.clone();
+                    target.x += 12;
+                    currentModel.lookAt(target);
                 } else {
                     currentModel.rotation.set(0,0,0);
                 }
             }
 
-            controls.update();
+            controls.update(); // 虽然手动旋转了scene，controls依然需要update
             renderer.render(scene, camera);
         }
-
-        // 等待用户点击 "开始" 按钮触发 init()
     </script>
 </body>
 </html>
