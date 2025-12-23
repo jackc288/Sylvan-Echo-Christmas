@@ -3,34 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Christmas Magic Pro</title>
+    <title>Christmas Magic Pro - Snow Edition</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #020205; font-family: "Helvetica Neue", sans-serif; }
         #container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
         
-        /* 1. 顶部艺术字 (加大、金色、发光) */
+        /* 1. 顶部艺术字 */
         #top-title {
             position: absolute; top: 8vh; width: 100%; text-align: center;
-            font-family: 'Georgia', serif; 
-            font-size: 3rem; /* 加大 */
-            font-weight: 800;
-            /* 金色渐变 */
+            font-family: 'Georgia', serif; font-size: 3rem; font-weight: 800;
             background: linear-gradient(to bottom, #ffd700, #ffb300, #fff8e1);
             -webkit-background-clip: text; color: transparent;
-            /* 强力发光 */
             filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.8));
-            z-index: 10; pointer-events: none;
-            transition: opacity 0.5s;
+            z-index: 10; pointer-events: none; transition: opacity 0.5s;
         }
 
-        /* 2. 调试面板 (恢复显示) */
+        /* 2. 调试面板 */
         #debug-panel {
             position: absolute; top: 10px; left: 10px; z-index: 20;
             background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);
             padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);
             color: #00ff00; font-family: monospace; font-size: 12px;
-            pointer-events: none; text-align: left;
-            min-width: 120px;
+            pointer-events: none; text-align: left; min-width: 120px;
         }
 
         /* 3. 启动遮罩 */
@@ -55,8 +49,8 @@
         #message-box {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 80%; max-width: 320px; padding: 25px;
-            background: rgba(20, 20, 30, 0.7);
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            background: rgba(20, 20, 30, 0.7); backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             border: 1px solid rgba(255,215,0,0.4); border-radius: 20px;
             color: #ffd700; font-size: 1.3rem; text-align: center;
             box-shadow: 0 0 50px rgba(255,215,0, 0.3);
@@ -104,9 +98,7 @@
     
     <div id="message-box">
         🎁 Merry Christmas 🎁<br>
-        <div style="font-size: 0.9rem; color: #fff; margin-top: 10px; opacity:0.8;">
-            Make a Wish!
-        </div>
+        <div style="font-size: 0.9rem; color: #fff; margin-top: 10px; opacity:0.8;">Make a Wish!</div>
     </div>
 
     <video id="video-preview" playsinline webkit-playsinline muted autoplay></video>
@@ -138,23 +130,24 @@
 
         // --- 全局变量 ---
         let scene, camera, renderer, controls;
-        let ornaments = []; 
+        let treeGroup; // 新增：树的组，用于独立旋转
+        let ornaments = [];
         let flowParticles = []; 
+        let snowParticles; // 新增：雪花
         let starMesh; 
         let currentModel = null, currentModelName = 'hachiware';
         
         // 交互状态
         let targetShape = 'random'; 
-        let handClenchLevel = 0; 
+        let handClenchLevel = 0;
         let isHandDetected = false;
         let sceneRotationVelocity = 0;
         let previousHandX = 0;
 
-        // --- 配置升级 ---
+        // --- 配置 ---
         const TREE_HEIGHT = 24;
         const TREE_RADIUS = 9;
-        // 数量增加 2.5倍 (800 -> 2000)
-        const ORNAMENT_COUNT = 2000; 
+        const ORNAMENT_COUNT = 2000;
         const FLOW_COUNT = 400; 
 
         const MODELS = {
@@ -193,6 +186,7 @@
             scene = new THREE.Scene();
             scene.fog = new THREE.FogExp2(0x020205, 0.02);
             
+            // 摄像机位置
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 6, 45);
 
@@ -200,17 +194,16 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.2; // 增加曝光让亮色更亮
+            renderer.toneMappingExposure = 1.2;
             document.getElementById('container').appendChild(renderer.domElement);
 
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
-            controls.autoRotate = true;
-            controls.autoRotateSpeed = 0.8;
+            controls.autoRotate = false; // 关闭摄像机自动旋转，改为手动控制物体旋转
 
-            // 灯光升级
+            // 灯光
             scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-            const dl = new THREE.DirectionalLight(0xffd700, 1.5); // 金色主光
+            const dl = new THREE.DirectionalLight(0xffd700, 1.5);
             dl.position.set(10, 20, 20);
             scene.add(dl);
             
@@ -218,9 +211,15 @@
             spotLight.position.set(0, 30, 10);
             scene.add(spotLight);
 
+            // 创建树的组 (Mod 4: 独立旋转组)
+            treeGroup = new THREE.Group();
+            scene.add(treeGroup);
+
             createBlockTree(); 
             createFlowParticles(); 
-            createGoldenStar(); // 金色星星
+            createGoldenStar();
+            createSnow(); // (Mod 1: 创建雪花)
+
             loadMMDModel('hachiware');
 
             window.switchModel = (name) => {
@@ -232,45 +231,66 @@
             };
         }
 
-        // --- 积木树 (高亮版) ---
+        // --- 1. 雪花效果 (Mod 1) ---
+        function createSnow() {
+            const particleCount = 1500;
+            const geom = new THREE.BufferGeometry();
+            const positions = [];
+            const velocities = [];
+
+            for(let i=0; i<particleCount; i++){
+                // 随机分布在场景上方
+                positions.push(
+                    (Math.random() - 0.5) * 100, // x
+                    Math.random() * 60,          // y (0 to 60)
+                    (Math.random() - 0.5) * 80   // z
+                );
+                // 不同的下落速度
+                velocities.push(0.05 + Math.random() * 0.1); 
+            }
+
+            geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geom.setAttribute('velocity', new THREE.Float32BufferAttribute(velocities, 1));
+
+            const mat = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.2,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            snowParticles = new THREE.Points(geom, mat);
+            scene.add(snowParticles); // 雪花加到 scene，不随树旋转
+        }
+
+        // --- 积木树 ---
         function createBlockTree() {
-            // 体积缩小为 1/3 (原来是 1 -> 0.33)
-            const s = 0.35; 
+            const s = 0.35;
             const geoCube = new THREE.BoxGeometry(s, s, s);
             const geoTetra = new THREE.TetrahedronGeometry(s * 0.7);
             const geoSphere = new THREE.SphereGeometry(s * 0.6, 12, 12);
             
-            // 颜色升级：亮绿、亮橙、亮金
-            const matGreen = new THREE.MeshStandardMaterial({ 
-                color: 0x20e647, // 荧光绿
-                roughness: 0.2, metalness: 0.1 
-            });
-            const matRed = new THREE.MeshStandardMaterial({ 
-                color: 0xff3838, // 鲜红
-                roughness: 0.2 
-            });
+            const matGreen = new THREE.MeshStandardMaterial({ color: 0x20e647, roughness: 0.2, metalness: 0.1 });
+            const matRed = new THREE.MeshStandardMaterial({ color: 0xff3838, roughness: 0.2 });
             const matGrey = new THREE.MeshStandardMaterial({ 
-                color: 0xdddddd, // 亮灰
+                color: 0xdddddd, // 灰色基础色
                 roughness: 0.1 
             });
-            
+
             // 亮橙金点材质
             const cvs = document.createElement('canvas');
             cvs.width = 64; cvs.height = 64;
             const ctx = cvs.getContext('2d');
-            ctx.fillStyle = '#ff9f0a'; // 亮橙
-            ctx.fillRect(0,0,64,64);
-            ctx.fillStyle = '#ffff00'; // 亮黄点
+            ctx.fillStyle = '#ff9f0a'; ctx.fillRect(0,0,64,64);
+            ctx.fillStyle = '#ffff00';
             [[32,32], [16,16], [48,16], [16,48], [48,48]].forEach(pos => {
                 ctx.beginPath(); ctx.arc(pos[0], pos[1], 4, 0, Math.PI*2); ctx.fill();
             });
             const texOrange = new THREE.CanvasTexture(cvs);
             const matOrange = new THREE.MeshStandardMaterial({ map: texOrange, roughness: 0.2, emissive: 0x331100 });
-
-            // 亮金材质
+            
             const matGold = new THREE.MeshStandardMaterial({
-                color: 0xffd700,
-                metalness: 0.8, roughness: 0.2,
+                color: 0xffd700, metalness: 0.8, roughness: 0.2,
                 emissive: 0xaa6600, emissiveIntensity: 0.2
             });
 
@@ -278,37 +298,32 @@
                 let mesh, type;
                 const r = Math.random();
 
-                if (r < 0.25) { 
-                    mesh = new THREE.Mesh(geoCube, matGreen); type = 'green';
-                } else if (r < 0.45) { 
-                    mesh = new THREE.Mesh(geoTetra, matGreen); type = 'green';
-                } else if (r < 0.60) { 
-                    mesh = new THREE.Mesh(geoTetra, matRed); type = 'red';
-                } else if (r < 0.70) { 
-                    mesh = new THREE.Mesh(geoSphere, matRed); type = 'red';
-                } else if (r < 0.80) { 
+                if (r < 0.25) { mesh = new THREE.Mesh(geoCube, matGreen); type = 'green'; }
+                else if (r < 0.45) { mesh = new THREE.Mesh(geoTetra, matGreen); type = 'green'; }
+                else if (r < 0.60) { mesh = new THREE.Mesh(geoTetra, matRed); type = 'red'; }
+                else if (r < 0.70) { mesh = new THREE.Mesh(geoSphere, matRed); type = 'red'; }
+                else if (r < 0.80) { 
                     // 灰色闪烁块
                     const m = matGrey.clone();
-                    mesh = new THREE.Mesh(geoCube, m); type = 'flash';
-                } else if (r < 0.90) {
-                    mesh = new THREE.Mesh(geoSphere, matOrange); type = 'orange';
-                } else {
-                    // 金色块
-                    mesh = new THREE.Mesh(geoCube, matGold); type = 'gold';
-                }
+                    mesh = new THREE.Mesh(geoCube, m); 
+                    type = 'flash';
+                } else if (r < 0.90) { mesh = new THREE.Mesh(geoSphere, matOrange); type = 'orange'; }
+                else { mesh = new THREE.Mesh(geoCube, matGold); type = 'gold'; }
 
                 // 初始散开
                 const spread = 60;
                 mesh.position.set((Math.random()-0.5)*spread, (Math.random()-0.5)*spread, (Math.random()-0.5)*spread);
                 
-                // 树形态
-                const yNorm = i / ORNAMENT_COUNT; 
+                // 树形态 (Mod 3: 随机分布)
+                const yNorm = i / ORNAMENT_COUNT;
                 const y = yNorm * TREE_HEIGHT - (TREE_HEIGHT / 2); 
-                const radius = TREE_RADIUS * (1 - yNorm); 
-                const angle = i * 0.5; // 紧密
+                const radius = TREE_RADIUS * (1 - yNorm);
+                // 旧逻辑: const angle = i * 0.5;
+                // 新逻辑: 完全随机角度
+                const angle = Math.random() * Math.PI * 2; 
 
-                scene.add(mesh);
-                
+                // 注意：这里添加到 treeGroup
+                treeGroup.add(mesh);
                 ornaments.push({
                     mesh: mesh,
                     type: type,
@@ -319,7 +334,7 @@
             }
         }
 
-        // --- 流动粒子 (靠近树体) ---
+        // --- 流动粒子 ---
         function createFlowParticles() {
             const geo = new THREE.BufferGeometry();
             const pos = new Float32Array(FLOW_COUNT * 3);
@@ -328,17 +343,19 @@
 
             for (let i = 0; i < FLOW_COUNT; i++) {
                 pos[i*3] = 0; pos[i*3+1] = 0; pos[i*3+2] = 0;
-                speeds[i] = 0.05 + Math.random() * 0.15; 
+                // (Mod 2: 流速减慢为原来的 2/3)
+                // 原速: 0.05 + Math.random() * 0.15
+                // 新速: * 0.66
+                speeds[i] = (0.05 + Math.random() * 0.15) * 0.66; 
                 offsets[i] = Math.random() * Math.PI * 2;
             }
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-            
             const mat = new THREE.PointsMaterial({
                 color: 0xffffff, size: 0.3, transparent: true, opacity: 0.8,
                 blending: THREE.AdditiveBlending
             });
             const points = new THREE.Points(geo, mat);
-            scene.add(points);
+            treeGroup.add(points); // 添加到 treeGroup
             flowParticles = { mesh: points, speeds: speeds, offsets: offsets };
         }
 
@@ -347,34 +364,29 @@
             const shape = new THREE.Shape();
             const outer = 1.2, inner = 0.5;
             for (let i=0; i<10; i++) {
-                const rad = i * Math.PI * 0.2; 
+                const rad = i * Math.PI * 0.2;
                 const len = (i%2===0) ? outer : inner;
                 const x = Math.cos(rad) * len;
                 const y = Math.sin(rad) * len;
                 if(i===0) shape.moveTo(x, y); else shape.lineTo(x, y);
             }
             shape.closePath();
-
             const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.4, bevelEnabled: true, bevelSegments: 2, bevelSize: 0.1, bevelThickness: 0.1 });
-            // 亮金色自发光
             const material = new THREE.MeshStandardMaterial({ 
-                color: 0xffd700, 
-                emissive: 0xffa500, 
-                emissiveIntensity: 0.8,
-                roughness: 0.2, metalness: 0.8
+                color: 0xffd700, emissive: 0xffa500, emissiveIntensity: 0.8, roughness: 0.2, metalness: 0.8
             });
             
             starMesh = new THREE.Mesh(geometry, material);
             starMesh.position.set(0, TREE_HEIGHT/2 + 1.5, 0);
             starMesh.visible = false;
-            scene.add(starMesh);
             
-            // 增加一个点光源绑定在星星上
             const starLight = new THREE.PointLight(0xffd700, 2, 20);
             starMesh.add(starLight);
+            
+            treeGroup.add(starMesh); // 添加到 treeGroup
         }
 
-        // --- 逻辑 ---
+        // --- AI 逻辑 ---
         let handLandmarker;
         async function preloadAI() {
             try {
@@ -385,9 +397,7 @@
                 });
                 startBtn.disabled = false; startBtn.classList.add('ready'); startBtn.innerText = "点击开启魔法";
                 loadingText.innerText = "准备就绪";
-            } catch (e) {
-                loadingText.innerText = "AI 加载失败";
-            }
+            } catch (e) { loadingText.innerText = "AI 加载失败"; }
         }
 
         async function startCamera() {
@@ -402,13 +412,26 @@
                 if (currentModel) scene.remove(currentModel);
                 currentModel = mesh;
                 mesh.scale.set(1.5, 1.5, 1.5);
-                mesh.position.set(12, -10, 0);
-                mesh.rotation.set(0,0,0);
+                
+                // (Mod 4: 固定位置)
+                // 原位置: (12, -10, 0)
+                // 新位置: 左后方 (x负, z负或略微靠后). 摄像机在z=45.
+                // 我们设在 x=-14, z=-8 左右，让他在树的左后方
+                mesh.position.set(-14, -10, -8);
+                
+                // 强制面向摄像机
+                if(camera) {
+                    // 让模型看向摄像机所在的水平位置(忽略Y轴差异以保持直立)
+                    mesh.lookAt(camera.position.x, -10, camera.position.z);
+                }
+
                 mesh.material.forEach(m => {
                     m.emissive = new THREE.Color(0x333333);
                     if(name==='usagi') m.color.setHex(0xFFEEAA);
                     if(name==='hachiware') m.color.setHex(0xDDEEFF);
                 });
+                
+                // 注意：人物直接加入 scene，不加入 treeGroup，所以不会随树旋转
                 scene.add(mesh);
             });
         }
@@ -429,35 +452,25 @@
                     const lm = res.landmarks[0];
                     const wrist = lm[0];
                     
-                    // Debug 更新
-                    debugHand.innerText = "已检测";
-                    debugHand.style.color = "#00ff00";
+                    debugHand.innerText = "已检测"; debugHand.style.color = "#00ff00";
 
-                    // 计算握拳度
                     const tips = [8,12,16,20];
                     let dist = 0;
                     tips.forEach(i => dist += Math.sqrt(Math.pow(lm[i].x-wrist.x,2) + Math.pow(lm[i].y-wrist.y,2)));
                     dist /= 4;
-                    // 显示 raw data
+                    
                     debugClench.innerText = dist.toFixed(3);
-
                     let rawClench = THREE.MathUtils.mapLinear(dist, 0.45, 0.2, 0, 1);
                     handClenchLevel += (THREE.MathUtils.clamp(rawClench, 0, 1) - handClenchLevel) * 0.15;
 
                     if (handClenchLevel > 0.7) { 
-                        targetShape = 'tree'; 
-                        debugState.innerText = "Tree (Fist)";
-                        debugState.style.color = "#ffd700";
+                        targetShape = 'tree'; debugState.innerText = "Tree (Fist)"; debugState.style.color = "#ffd700";
                     } else if (handClenchLevel < 0.3) { 
-                        targetShape = 'firework';
-                        debugState.innerText = "Firework (Palm)";
-                        debugState.style.color = "#ff4757";
+                        targetShape = 'firework'; debugState.innerText = "Firework (Palm)"; debugState.style.color = "#ff4757";
                     } else {
-                        debugState.innerText = "Morphing...";
-                        debugState.style.color = "#fff";
+                        debugState.innerText = "Morphing..."; debugState.style.color = "#fff";
                     }
 
-                    // 扇动
                     const rawX = 0.5 - wrist.x;
                     if (targetShape === 'firework') {
                          const delta = rawX - previousHandX;
@@ -465,7 +478,6 @@
                     }
                     previousHandX = rawX;
 
-                    // OK 手势
                     const pinch = Math.sqrt(Math.pow(lm[4].x-lm[8].x,2) + Math.pow(lm[4].y-lm[8].y,2));
                     const middle = Math.sqrt(Math.pow(lm[12].x-wrist.x,2) + Math.pow(lm[12].y-wrist.y,2));
                     if (pinch < 0.06 && middle > 0.25) {
@@ -477,10 +489,8 @@
                     isHandDetected = false;
                     handClenchLevel = 0;
                     targetShape = 'random';
-                    debugHand.innerText = "未检测";
-                    debugHand.style.color = "#ff0000";
-                    debugClench.innerText = "0.00";
-                    debugState.innerText = "Idle";
+                    debugHand.innerText = "未检测"; debugHand.style.color = "#ff0000";
+                    debugClench.innerText = "0.00"; debugState.innerText = "Idle";
                 }
             }
         }
@@ -491,22 +501,35 @@
             
             const time = Date.now() * 0.001;
 
-            // 旋转
+            // 旋转控制 (Mod 4: 只旋转 treeGroup)
             if (Math.abs(sceneRotationVelocity) > 0.001) {
-                scene.rotation.y += sceneRotationVelocity;
+                treeGroup.rotation.y += sceneRotationVelocity;
                 sceneRotationVelocity *= 0.95; 
             } else {
-                scene.rotation.y += 0.002;
+                treeGroup.rotation.y += 0.002;
+            }
+
+            // 雪花动画 (Mod 1)
+            if(snowParticles) {
+                const positions = snowParticles.geometry.attributes.position.array;
+                const vels = snowParticles.geometry.attributes.velocity.array;
+                for(let i=0; i<vels.length; i++) {
+                    const idx = i * 3;
+                    positions[idx+1] -= vels[i]; // 向下移动 Y
+                    // 触底复位
+                    if(positions[idx+1] < -20) {
+                        positions[idx+1] = 50;
+                    }
+                }
+                snowParticles.geometry.attributes.position.needsUpdate = true;
             }
 
             const isTree = (targetShape === 'tree');
             
-            // 星星
             if (starMesh) {
                 starMesh.visible = (isTree && handClenchLevel > 0.8);
                 if (starMesh.visible) {
                     starMesh.rotation.y += 0.02;
-                    // 悬浮微动
                     starMesh.position.y = TREE_HEIGHT/2 + 1.5 + Math.sin(time*2)*0.2;
                 }
             }
@@ -515,9 +538,10 @@
             ornaments.forEach(p => {
                 const cur = p.mesh.position;
 
-                // 闪光
+                // (Mod 3: 灰色闪烁处理)
                 if (p.type === 'flash') {
-                    const flash = (time % 0.75 < 0.1); // 0.75s 周期
+                    const flash = (time % 0.75 < 0.1); 
+                    // 亮时为白光，暗时 emissive 为黑，从而显示材质本来的灰色
                     p.mesh.material.emissive.setHex(flash ? 0xffffff : 0x000000);
                     p.mesh.material.emissiveIntensity = flash ? 3.0 : 0;
                 }
@@ -530,7 +554,7 @@
                     if (p.velocity.lengthSq() < 0.001) {
                         const dir = cur.clone().normalize(); 
                         if (dir.lengthSq()===0) dir.set(0,1,0);
-                        const speed = Math.random() * 0.6 + 0.3; // 增加爆炸速度
+                        const speed = Math.random() * 0.6 + 0.3;
                         p.velocity.copy(dir).multiplyScalar(speed);
                     }
                     cur.add(p.velocity);
@@ -541,20 +565,16 @@
                 }
             });
 
-            // 流光粒子 (紧贴树)
+            // 流光粒子
             if (flowParticles.mesh) {
                 const pos = flowParticles.mesh.geometry.attributes.position.array;
                 for(let i=0; i<FLOW_COUNT; i++) {
                     const idx = i*3;
-                    pos[idx+1] += flowParticles.speeds[i]; // 上升
+                    pos[idx+1] += flowParticles.speeds[i]; 
                     
                     const angle = time * 0.8 + flowParticles.offsets[i];
-                    
-                    // 靠近逻辑: TREE_RADIUS * 1.15 (紧贴)
-                    // y norm: 0(bottom) -> 1(top)
                     const normalizedY = (pos[idx+1] + TREE_HEIGHT/2) / TREE_HEIGHT;
-                    // 随高度收缩半径
-                    const r = TREE_RADIUS * 1.15 * (1 - normalizedY * 0.7); 
+                    const r = TREE_RADIUS * 1.15 * (1 - normalizedY * 0.7);
                     
                     pos[idx] = Math.cos(angle) * r;
                     pos[idx+2] = Math.sin(angle) * r;
@@ -565,7 +585,7 @@
                 flowParticles.mesh.visible = isTree;
             }
 
-            // 人物手臂
+            // 人物手臂动画
             if (currentModel && currentModel.skeleton) {
                 const bones = currentModel.skeleton.bones;
                 const armL = bones.find(b => b.name === '左腕');
