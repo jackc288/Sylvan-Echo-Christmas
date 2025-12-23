@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Christmas Magic Pro - Interactive Art</title>
+    <title>Christmas Magic Ultimate</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #020205; font-family: "Helvetica Neue", sans-serif; }
         #container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
@@ -131,36 +131,38 @@
         // --- 全局变量 ---
         let scene, camera, renderer, controls;
         let treeGroup; 
-        let starFieldGroup; // 猎户座与星星背景组
-        let snowParticles;  // 雪花
+        let starFieldGroup; 
+        let snowParticles;  
         let ornaments = [];
         let flowParticles = []; 
+        let starMesh; 
         let currentModel = null, currentModelName = 'hachiware';
         
-        // 材质引用 (用于变色)
-        let matMutable; // 80%球体的材质
-        let matSnow;    // 雪花材质
+        // 可变材质引用 (颜色同步)
+        let matMutable; // 金球
+        let matFlow;    // 粒子流
+        let matSnow;    // 雪花
+        let matStar;    // 顶部星星
+        let matFlashGroup = []; // 需要闪烁的其他积木材质
 
         // 状态
         let targetShape = 'tree'; 
         let handClenchLevel = 0;
         let isHandDetected = false;
-        let sceneRotationVelocity = 0;
         let previousHandX = 0;
         
         // 变色逻辑
-        let colorState = 0; // 0: Gold, 1: Blue, 2: Pink
+        let colorState = 0; 
         let lastWaveTime = 0;
+        // 颜色配置: Gold, Ice, Pink
         const COLORS = {
-            0: { name: 'Gold', sphere: 0xffd700, emissive: 0xaa6600, snow: 0xffffff },
-            1: { name: 'Ice',  sphere: 0x88ccff, emissive: 0x0044aa, snow: 0xaaddff },
-            2: { name: 'Pink', sphere: 0xffb7c5, emissive: 0xff69b4, snow: 0xffc0cb }
+            0: { name: 'Gold', sphere: 0xffaa00, emissive: 0xff8800, snow: 0xffffff, flow: 0xfffee0 },
+            1: { name: 'Ice',  sphere: 0x00ccff, emissive: 0x0066ff, snow: 0xaaddff, flow: 0xccffff },
+            2: { name: 'Pink', sphere: 0xff69b4, emissive: 0xff1493, snow: 0xffc0cb, flow: 0xffe6ea }
         };
 
-        // --- 配置 ---
         const TREE_HEIGHT = 24;
         const TREE_RADIUS = 9;
-        // Mod 1: 数量增加到 4500
         const ORNAMENT_COUNT = 4500;
         const FLOW_COUNT = 400; 
 
@@ -228,8 +230,9 @@
 
             createBlockTree(); 
             createFlowParticles(); 
-            createOrionAndStars(); // Mod 2: 猎户座背景
-            createSnow();          // Mod 2: 雪花
+            createGoldenStar(); // 顶部星星
+            createOrionAndStars(); 
+            createSnow();          
 
             loadMMDModel('hachiware');
             
@@ -242,56 +245,54 @@
             };
         }
 
-        // --- 1. 背景：猎户座与星星 (Mod 2) ---
+        // --- 辅助：生成雪花贴图 ---
+        function createSnowflakeTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#000000'; ctx.fillRect(0,0,64,64); // 背景黑(透明)
+            
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            
+            ctx.translate(32, 32);
+            for(let i=0; i<6; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0,0); ctx.lineTo(0, -28);
+                ctx.moveTo(0, -18); ctx.lineTo(-10, -24);
+                ctx.moveTo(0, -18); ctx.lineTo(10, -24);
+                ctx.stroke();
+                ctx.rotate(Math.PI / 3);
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            return tex;
+        }
+
+        // --- 1. 背景：猎户座 ---
         function createOrionAndStars() {
             starFieldGroup = new THREE.Group();
-            
-            // 普通星星
             const starGeo = new THREE.BufferGeometry();
             const starPos = [];
             for(let i=0; i<1000; i++) {
-                const x = (Math.random() - 0.5) * 200;
-                const y = (Math.random() - 0.5) * 100 + 20; // 偏上
-                const z = (Math.random() - 0.5) * 100 - 50; // 偏远
-                starPos.push(x, y, z);
+                starPos.push((Math.random()-0.5)*200, (Math.random()-0.5)*100+20, (Math.random()-0.5)*100-50);
             }
             starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
             const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.4, transparent: true, opacity: 0.8 });
-            const stars = new THREE.Points(starGeo, starMat);
-            starFieldGroup.add(stars);
+            starFieldGroup.add(new THREE.Points(starGeo, starMat));
 
-            // 猎户座 (简化坐标模拟)
-            // 参宿四(Betelgeuse), 参宿七(Rigel), 参宿五(Bellatrix), 参宿六(Saiph), 腰带三颗
-            const orionStars = [
-                [-10, 15, -60], [10, 12, -60],  // 肩膀
-                [-2, 5, -60], [0, 6, -60], [2, 7, -60], // 腰带
-                [-8, -8, -60], [12, -10, -60] // 膝盖
-            ];
+            // 猎户座
+            const orionStars = [[-10, 15, -60], [10, 12, -60], [-2, 5, -60], [0, 6, -60], [2, 7, -60], [-8, -8, -60], [12, -10, -60]];
             const orionGeo = new THREE.BufferGeometry();
-            const orionPos = [];
-            orionStars.forEach(p => orionPos.push(...p));
+            const orionPos = []; orionStars.forEach(p => orionPos.push(...p));
             orionGeo.setAttribute('position', new THREE.Float32BufferAttribute(orionPos, 3));
-            
-            // 猎户座亮星
             const orionMat = new THREE.PointsMaterial({ color: 0xaaccff, size: 1.5, emissive: 0xffffff, emissiveIntensity: 1 });
-            const orionPoints = new THREE.Points(orionGeo, orionMat);
-            starFieldGroup.add(orionPoints);
-
-            // 连线
-            const lineGeo = new THREE.BufferGeometry();
-            const linePos = [];
-            // 简单连线：肩-腰-膝
-            const indices = [0,2, 2,3, 3,4, 4,1, 0,5, 1,6, 2,5, 4,6]; // 抽象连线
-            indices.forEach(i => linePos.push(...orionStars[i]));
-            lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePos, 3));
-            const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.2, transparent: true });
-            const lines = new THREE.LineSegments(lineGeo, lineMat);
-            starFieldGroup.add(lines);
+            starFieldGroup.add(new THREE.Points(orionGeo, orionMat));
 
             scene.add(starFieldGroup);
         }
 
-        // --- 2. 雪花 (可变色) ---
+        // --- 2. 雪花 (Mod: 纹理 + 变色) ---
         function createSnow() {
             const particleCount = 2000;
             const geom = new THREE.BufferGeometry();
@@ -304,64 +305,104 @@
             geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
             geom.setAttribute('velocity', new THREE.Float32BufferAttribute(velocities, 1));
 
-            // Mod: 使用全局引用 matSnow 以便变色
+            // 使用雪花贴图
+            const tex = createSnowflakeTexture();
             matSnow = new THREE.PointsMaterial({
-                color: 0xffffff, size: 0.3, transparent: true, opacity: 0.8
+                color: COLORS[0].snow, 
+                size: 1.2, // 稍微大一点看清雪花
+                map: tex,
+                transparent: true, 
+                opacity: 0.9,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
             });
 
             snowParticles = new THREE.Points(geom, matSnow);
-            snowParticles.visible = false; // 初始隐藏
+            snowParticles.visible = false;
             scene.add(snowParticles);
         }
 
-        // --- 3. 积木树 (Mod 1: 小方块，80%金球) ---
+        // --- 3. 顶部大星星 (Mod: 存在感) ---
+        function createGoldenStar() {
+            const shape = new THREE.Shape();
+            const outer = 1.5, inner = 0.6;
+            for (let i=0; i<10; i++) {
+                const rad = i * Math.PI * 0.2;
+                const len = (i%2===0) ? outer : inner;
+                const x = Math.cos(rad) * len;
+                const y = Math.sin(rad) * len;
+                if(i===0) shape.moveTo(x, y); else shape.lineTo(x, y);
+            }
+            shape.closePath();
+            const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.5, bevelEnabled: true, bevelSegments: 2, bevelSize: 0.1, bevelThickness: 0.1 });
+            
+            // 可变色
+            matStar = new THREE.MeshStandardMaterial({ 
+                color: COLORS[0].sphere, 
+                emissive: COLORS[0].emissive, 
+                emissiveIntensity: 1.5, // 顶部星星更亮
+                roughness: 0.1, metalness: 0.9
+            });
+            
+            starMesh = new THREE.Mesh(geometry, matStar);
+            starMesh.position.set(0, TREE_HEIGHT/2 + 2, 0);
+            
+            const starLight = new THREE.PointLight(0xffffff, 2, 30);
+            starMesh.add(starLight);
+            
+            treeGroup.add(starMesh);
+        }
+
+        // --- 4. 积木树 (Mod: 金球变大变亮，其他闪烁) ---
         function createBlockTree() {
-            // 尺寸缩小一倍 (0.35 -> 0.18)
             const s = 0.18;
             
-            // 几何体
             const geoCube = new THREE.BoxGeometry(s, s, s);
             const geoTetra = new THREE.TetrahedronGeometry(s * 0.8);
-            // 金球几何体 (低多边形一点以提升性能)
-            const geoSphere = new THREE.SphereGeometry(s * 0.7, 8, 8);
+            // 金球变大: s * 1.3
+            const geoSphere = new THREE.SphereGeometry(s * 1.3, 16, 16);
 
-            // 杂色材质
-            const matGreen = new THREE.MeshStandardMaterial({ color: 0x20e647, roughness: 0.2 });
-            const matRed = new THREE.MeshStandardMaterial({ color: 0xff3838, roughness: 0.2 });
-            const matSilver = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.1 });
+            // 闪烁材质组 (需要独立实例以便控制emissive)
+            // 这里我们创建基础材质，在 animate 中控制 emissiveIntensity
+            const matGreen = new THREE.MeshStandardMaterial({ color: 0x20e647, roughness: 0.2, emissive: 0x003300 });
+            const matRed = new THREE.MeshStandardMaterial({ color: 0xff3838, roughness: 0.2, emissive: 0x330000 });
+            const matSilver = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.1, emissive: 0x111111 });
             
-            // Mod: 可变色材质 (用于80%的主体球)
+            matFlashGroup = [matGreen, matRed, matSilver];
+
+            // 80% 主球材质
             matMutable = new THREE.MeshStandardMaterial({
                 color: COLORS[0].sphere,
-                metalness: 0.9, roughness: 0.2,
-                emissive: COLORS[0].emissive, emissiveIntensity: 0.3
+                metalness: 0.9, roughness: 0.1,
+                emissive: COLORS[0].emissive, 
+                emissiveIntensity: 0.8 // 基础亮度增加
             });
 
             for (let i = 0; i < ORNAMENT_COUNT; i++) {
                 let mesh, type;
                 const r = Math.random();
-                // 随机缩放 (0.5 ~ 1.5倍)
                 const scaleRand = 0.5 + Math.random(); 
 
-                // Mod 1: 80% 概率是可变色球体
                 if (r < 0.80) {
                     mesh = new THREE.Mesh(geoSphere, matMutable);
                     type = 'mutable_sphere';
                 } else {
-                    // 20% 其他
-                    if (Math.random() < 0.33) mesh = new THREE.Mesh(geoCube, matGreen);
-                    else if (Math.random() < 0.66) mesh = new THREE.Mesh(geoTetra, matRed);
-                    else mesh = new THREE.Mesh(geoCube, matSilver);
+                    let baseMat;
+                    if (Math.random() < 0.33) baseMat = matGreen;
+                    else if (Math.random() < 0.66) baseMat = matRed;
+                    else baseMat = matSilver;
+                    
+                    mesh = new THREE.Mesh(geoCube, baseMat);
                     type = 'decoration';
                 }
                 
                 mesh.scale.setScalar(scaleRand);
 
-                // 初始位置 (随机散开)
+                // 初始位置
                 const spread = 60;
                 mesh.position.set((Math.random()-0.5)*spread, (Math.random()-0.5)*spread, (Math.random()-0.5)*spread);
                 
-                // 目标位置 (树)
+                // 树形态
                 const yNorm = i / ORNAMENT_COUNT;
                 const y = yNorm * TREE_HEIGHT - (TREE_HEIGHT / 2); 
                 const radius = TREE_RADIUS * (1 - yNorm);
@@ -371,8 +412,7 @@
                 ornaments.push({
                     mesh: mesh,
                     type: type,
-                    initialPos: mesh.position.clone(), // 用于 Palm 扩散的参考点，或者随机点
-                    // 树形态的目标位置
+                    // 树的目标位置
                     treePos: new THREE.Vector3(Math.cos(angle)*radius, y, Math.sin(angle)*radius),
                     // 扩散方向
                     explodeDir: new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize(),
@@ -381,7 +421,7 @@
             }
         }
 
-        // --- 流动粒子 ---
+        // --- 5. 流动粒子 (Mod: 变色) ---
         function createFlowParticles() {
             const geo = new THREE.BufferGeometry();
             const pos = new Float32Array(FLOW_COUNT * 3);
@@ -393,10 +433,13 @@
                 offsets[i] = Math.random() * Math.PI * 2;
             }
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-            const mat = new THREE.PointsMaterial({
-                color: 0xffffff, size: 0.3, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending
+            
+            // 可变色
+            matFlow = new THREE.PointsMaterial({
+                color: COLORS[0].flow, 
+                size: 0.4, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending
             });
-            const points = new THREE.Points(geo, mat);
+            const points = new THREE.Points(geo, matFlow);
             treeGroup.add(points);
             flowParticles = { mesh: points, speeds: speeds, offsets: offsets };
         }
@@ -427,12 +470,8 @@
                 if (currentModel) scene.remove(currentModel);
                 currentModel = mesh;
                 mesh.scale.set(1.5, 1.5, 1.5);
-                
-                // Mod 3: 人物位置更远，稍微面对树
                 mesh.position.set(-22, -10, -5); 
-                // 让人物看向树的中心偏下位置
                 mesh.lookAt(0, -5, 0);
-
                 mesh.material.forEach(m => {
                     m.emissive = new THREE.Color(0x333333);
                     if(name==='usagi') m.color.setHex(0xFFEEAA);
@@ -442,19 +481,23 @@
             });
         }
 
-        // --- 变色触发器 ---
+        // --- 变色触发器 (高灵敏度) ---
         function triggerColorChange() {
             const now = Date.now();
-            if (now - lastWaveTime < 800) return; // 冷却时间 0.8秒
+            if (now - lastWaveTime < 600) return; // 冷却 0.6s
             lastWaveTime = now;
 
-            // 切换状态
             colorState = (colorState + 1) % 3;
             const c = COLORS[colorState];
             
-            // 更新材质
+            // 同步所有颜色
             matMutable.color.setHex(c.sphere);
             matMutable.emissive.setHex(c.emissive);
+            
+            matStar.color.setHex(c.sphere);
+            matStar.emissive.setHex(c.emissive);
+
+            matFlow.color.setHex(c.flow);
             matSnow.color.setHex(c.snow);
 
             debugColor.innerText = c.name;
@@ -479,7 +522,7 @@
                     
                     debugHand.innerText = "已检测"; debugHand.style.color = "#00ff00";
 
-                    // 1. 计算握拳 (0=Open, 1=Fist)
+                    // 1. 握拳
                     const tips = [8,12,16,20];
                     let dist = 0;
                     tips.forEach(i => dist += Math.sqrt(Math.pow(lm[i].x-wrist.x,2) + Math.pow(lm[i].y-wrist.y,2)));
@@ -487,23 +530,29 @@
                     let rawClench = THREE.MathUtils.mapLinear(dist, 0.45, 0.2, 0, 1);
                     handClenchLevel += (THREE.MathUtils.clamp(rawClench, 0, 1) - handClenchLevel) * 0.15;
 
-                    // 2. 状态判定 (张手=Explode, 握拳=Tree/Clump)
-                    if (handClenchLevel > 0.6) { 
-                        targetShape = 'tree'; debugState.innerText = "Fist (Shrink)"; debugState.style.color = "#ffd700";
-                    } else if (handClenchLevel < 0.4) { 
-                        targetShape = 'firework'; debugState.innerText = "Palm (Explode)"; debugState.style.color = "#ff4757";
+                    // 2. 状态判定
+                    if (handClenchLevel > 0.7) { 
+                        targetShape = 'ball'; // Mod: 变成球
+                        debugState.innerText = "Fist (Ball)"; debugState.style.color = "#ffd700";
+                    } else if (handClenchLevel < 0.3) { 
+                        targetShape = 'firework'; 
+                        debugState.innerText = "Palm (Explode)"; debugState.style.color = "#ff4757";
+                    } else {
+                        targetShape = 'tree';
+                        debugState.innerText = "Normal Tree"; debugState.style.color = "#fff";
                     }
 
-                    // 3. 扇动检测 (Waving) - 变色
+                    // 3. 灵敏变色检测
+                    // 计算手掌水平速度
                     const rawX = 0.5 - wrist.x;
                     const delta = rawX - previousHandX;
-                    // 如果移动速度够快，触发变色
-                    if (Math.abs(delta) > 0.08) { // 阈值需要根据实际体验微调
+                    // 降低阈值 0.08 -> 0.025 (更灵敏)
+                    if (Math.abs(delta) > 0.025) { 
                         triggerColorChange();
                     }
                     previousHandX = rawX;
 
-                    // 4. OK手势 (许愿)
+                    // 4. OK手势
                     const pinch = Math.sqrt(Math.pow(lm[4].x-lm[8].x,2) + Math.pow(lm[4].y-lm[8].y,2));
                     const middle = Math.sqrt(Math.pow(lm[12].x-wrist.x,2) + Math.pow(lm[12].y-wrist.y,2));
                     if (pinch < 0.06 && middle > 0.25) {
@@ -515,7 +564,7 @@
                 } else {
                     isHandDetected = false;
                     handClenchLevel = 0;
-                    targetShape = 'tree'; // 无手时默认是树
+                    targetShape = 'tree'; 
                     debugHand.innerText = "未检测"; debugHand.style.color = "#ff0000";
                     debugState.innerText = "Auto Rotate";
                 }
@@ -528,33 +577,32 @@
             
             const time = Date.now() * 0.001;
 
-            // --- 背景与可见性控制 (Mod 2) ---
+            // --- 0. 闪烁逻辑 (0.5s 周期) ---
+            const flashState = (Date.now() % 500) < 250; // 250ms亮，250ms暗
+            matFlashGroup.forEach(m => {
+                // 基础色是黑/暗色，闪烁时变亮
+                m.emissiveIntensity = flashState ? 2.0 : 0.2;
+            });
+
+            // --- 背景逻辑 ---
             if (isHandDetected) {
-                // 有手：下雪，隐藏星星
                 if(starFieldGroup) starFieldGroup.visible = false;
                 if(snowParticles) snowParticles.visible = true;
-                
-                // 树旋转靠手势停止或减速，或者保持静止让形状变化更明显
-                // 这里设定为有手时停止自动旋转，只根据形状变化
                 treeGroup.rotation.y += 0.001; 
             } else {
-                // 无手：显示星星/猎户座，隐藏雪花
                 if(starFieldGroup) starFieldGroup.visible = true;
                 if(snowParticles) snowParticles.visible = false;
-                
-                // 自动旋转
                 treeGroup.rotation.y += 0.005;
-                
-                // 重置颜色状态 (可选，是否想要无手时自动变回金色？)
-                if (colorState !== 0) {
+                if (colorState !== 0) { // 无手复位金色
                      colorState = 0;
-                     matMutable.color.setHex(COLORS[0].sphere);
-                     matMutable.emissive.setHex(COLORS[0].emissive);
-                     matSnow.color.setHex(COLORS[0].snow);
+                     const c = COLORS[0];
+                     matMutable.color.setHex(c.sphere); matMutable.emissive.setHex(c.emissive);
+                     matStar.color.setHex(c.sphere); matStar.emissive.setHex(c.emissive);
+                     matFlow.color.setHex(c.flow); matSnow.color.setHex(c.snow);
                 }
             }
 
-            // 雪花动画
+            // 雪花物理
             if(snowParticles && snowParticles.visible) {
                 const positions = snowParticles.geometry.attributes.position.array;
                 const vels = snowParticles.geometry.attributes.velocity.array;
@@ -566,28 +614,47 @@
                 snowParticles.geometry.attributes.position.needsUpdate = true;
             }
 
-            // --- 积木物理 (核心 Mod) ---
+            // --- 积木物理 (关键逻辑) ---
+            // 目标中心点
+            const center = new THREE.Vector3(0, 0, 0);
+
             ornaments.forEach(p => {
                 const cur = p.mesh.position;
 
-                if (isHandDetected && targetShape === 'firework') {
-                    // --- 张开手：向外扩散 ---
-                    // 给一个向外的速度
-                    p.velocity.copy(p.explodeDir).multiplyScalar(0.5); // 爆炸力度
-                    cur.add(p.velocity);
-                    // 稍微加一点旋转
-                    p.mesh.rotation.x += 0.05;
+                if (isHandDetected) {
+                    if (targetShape === 'firework') {
+                        // 张手：扩散
+                        p.velocity.copy(p.explodeDir).multiplyScalar(0.5); 
+                        cur.add(p.velocity);
+                        p.mesh.rotation.x += 0.05;
+                    } else if (targetShape === 'ball') {
+                        // 握拳：缩成光球 (所有点去 (0,0,0))
+                        cur.lerp(center, 0.1); 
+                        p.velocity.set(0,0,0);
+                        p.mesh.rotation.x += 0.1; // 快速自旋
+                    } else {
+                        // 微握/过渡：回树
+                        cur.lerp(p.treePos, 0.1);
+                        p.velocity.set(0,0,0);
+                    }
                 } else {
-                    // --- 握拳(树) 或 无手(树) ---
-                    // 粒子回到 treePos (缩成一团)
-                    // 使用 lerp 插值，产生磁吸效果
+                    // 无手：回树
                     cur.lerp(p.treePos, 0.1);
                     p.velocity.set(0,0,0);
-                    p.mesh.rotation.x += 0.01;
                 }
             });
 
-            // --- 流光粒子 (Mod: 无论何种状态，始终跟随围绕中心) ---
+            // 顶部星星位置跟随 (如果是球体模式，星星也该下去吗？通常星星保持顶部或跟着缩)
+            // 这里让星星在握拳时也稍微下降一点点，更有整体感
+            if (targetShape === 'ball' && isHandDetected) {
+                starMesh.position.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+                starMesh.scale.setScalar(0.1); // 缩小消失在光球里
+            } else {
+                starMesh.position.lerp(new THREE.Vector3(0, TREE_HEIGHT/2 + 2, 0), 0.1);
+                starMesh.scale.setScalar(1);
+            }
+
+            // 流光粒子
             if (flowParticles.mesh) {
                 const pos = flowParticles.mesh.geometry.attributes.position.array;
                 for(let i=0; i<FLOW_COUNT; i++) {
@@ -595,12 +662,12 @@
                     pos[idx+1] += flowParticles.speeds[i]; 
                     
                     const angle = time * 0.8 + flowParticles.offsets[i];
-                    // 半径依据高度变化
                     const normalizedY = (pos[idx+1] + TREE_HEIGHT/2) / TREE_HEIGHT;
                     let r = TREE_RADIUS * 1.2 * (1 - normalizedY * 0.7);
                     
-                    // 如果是扩散状态，流光也稍微扩散一点点，但保持围绕
-                    if(targetShape === 'firework' && isHandDetected) r *= 1.5;
+                    if(targetShape === 'firework') r *= 1.5;
+                    // 握拳时粒子也收缩
+                    if(targetShape === 'ball') r *= 0.2;
 
                     pos[idx] = Math.cos(angle) * r;
                     pos[idx+2] = Math.sin(angle) * r;
@@ -610,7 +677,7 @@
                 flowParticles.mesh.geometry.attributes.position.needsUpdate = true;
             }
 
-            // 人物手臂动画
+            // 人物手臂
             if (currentModel && currentModel.skeleton) {
                 const bones = currentModel.skeleton.bones;
                 const armL = bones.find(b => b.name === '左腕');
