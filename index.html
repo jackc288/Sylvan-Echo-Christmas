@@ -27,30 +27,35 @@
         }
         @keyframes breathe { 50% { opacity: 0.8; text-shadow: 0 0 25px rgba(255, 105, 180, 0.9); } }
 
-        /* 双手爱心弹窗 */
+        /* 双手爱心弹窗：扩大宽度、优化内边距 */
         #custom-message-box {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(40, 20, 40, 0.4); backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 105, 180, 0.3); border-radius: 20px;
-            padding: 30px 50px; text-align: center; color: #fff;
+            /* 宽度设为视口的 90% 或最多 1100px（更宽以显示更多文字） */
+            width: min(1100px, 90vw);
+            max-width: 1100px;
+            background: rgba(40, 20, 40, 0.45); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 105, 180, 0.35); border-radius: 20px;
+            padding: 24px 32px; text-align: center; color: #fff;
             box-shadow: 0 0 50px rgba(255, 105, 180, 0.2);
             display: none; z-index: 50; animation: popIn 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+            box-sizing: border-box;
         }
         #custom-message-box textarea {
-            background: transparent; border: none; color: #fff; font-size: 1.2rem; 
+            background: transparent; border: none; color: #fff; font-size: 1.15rem; 
             font-family: 'Great Vibes', cursive; text-align: center; width: 100%; resize: none; outline: none;
             text-shadow: 0 0 5px rgba(255,192,203,0.5);
 
-            /* 新增：高度自适应/最大高度/溢出处理 */
+            /* 新增：高度自适应/最大高度/溢出处理（更大） */
             height: auto;
-            min-height: 48px;      /* 最小高度，防止过矮 */
-            max-height: 60vh;      /* 超过这个高度会出现内部滚动 */
+            min-height: 64px;      /* 更高的最小高度 */
+            max-height: 75vh;      /* 更宽的最大高度，允许更多内容显示 */
             overflow-y: auto;      /* 超长时可以滚动 */
-            line-height: 1.4;      /* 行高，可按需调整 */
-            padding: 6px 0;        /* 上下内边距，避免文字被裁 */
+            line-height: 1.45;     /* 行高，提升可读性 */
+            padding: 8px 12px;     /* 内边距，防止文字贴边 */
             box-sizing: border-box;
             word-break: break-word;  /* 防止长词连续撑破布局 */
             white-space: pre-wrap;   /* 保持换行字符（\n）并换行显示 */
+            -webkit-font-smoothing: antialiased;
         }
         @keyframes popIn { from { transform: translate(-50%, -50%) scale(0.8); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
 
@@ -187,7 +192,7 @@
             if (!el) return;
             el.style.height = 'auto';
             const sh = el.scrollHeight;
-            const minH = 48; // px，与 CSS min-height 保持一致
+            const minH = 64; // px，与 CSS min-height 保持一致
             el.style.height = Math.max(sh, minH) + 'px';
         }
         // 绑定输入事件（元素在 DOM 中，script 在 body 底部，所以可以立即查询）
@@ -547,14 +552,14 @@
             document.getElementById(activeUI).classList.add('active');
             handClench += (newClench - handClench) * 0.1;
 
-            // 替换原本的单行显示控制，改为在显示时触发 autosize 并可选聚焦
+            // 显示/隐藏消息框并在打开时 autosize
             if (state === 'love') {
                 if (box.style.display !== 'block') {
                     box.style.display = 'block';
                     const ta = box.querySelector('textarea');
                     if (ta) {
                         autosizeTextarea(ta);
-                        // 如果你希望打开时自动聚焦取消注释下一行
+                        // 若想自动聚焦可打开下一行
                         // ta.focus();
                     }
                 }
