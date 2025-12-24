@@ -37,9 +37,20 @@
             display: none; z-index: 50; animation: popIn 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
         #custom-message-box textarea {
-            background: transparent; border: none; color: #fff; font-size: 1.5rem; 
+            background: transparent; border: none; color: #fff; font-size: 1.2rem; 
             font-family: 'Great Vibes', cursive; text-align: center; width: 100%; resize: none; outline: none;
             text-shadow: 0 0 5px rgba(255,192,203,0.5);
+
+            /* 新增：高度自适应/最大高度/溢出处理 */
+            height: auto;
+            min-height: 48px;      /* 最小高度，防止过矮 */
+            max-height: 60vh;      /* 超过这个高度会出现内部滚动 */
+            overflow-y: auto;      /* 超长时可以滚动 */
+            line-height: 1.4;      /* 行高，可按需调整 */
+            padding: 6px 0;        /* 上下内边距，避免文字被裁 */
+            box-sizing: border-box;
+            word-break: break-word;  /* 防止长词连续撑破布局 */
+            white-space: pre-wrap;   /* 保持换行字符（\n）并换行显示 */
         }
         @keyframes popIn { from { transform: translate(-50%, -50%) scale(0.8); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
 
@@ -96,7 +107,14 @@
     <div id="top-title"><h1>Sylvan Echo, Happy Christmas</h1></div>
 
     <div id="custom-message-box">
-        <textarea rows="2">哈喽，mm<br>圣诞快乐！<br>我深深地感受到你是一个同理心很强很感性内心特别丰富的女孩子，但有时候确实单纯地让人心疼，让人很有保护欲呢<br>我本来挺想写很长一段话，来证明多么喜欢你，你对我有多么重要<br>我暂时不写爱，因为怕你承受太大压力<br>我写了写，改了又改<br>发现还是只想说两句话<br>"平安健康，天天开心"和"不要担心，我一直在你身边"</textarea>
+        <textarea id="bless-textarea">哈喽，mm
+圣诞快乐！
+我深深地感受到你是一个同理心很强很感性内心特别丰富的女孩子，但有时候确实单纯地让人心疼，让人很有保护欲呢
+我本来挺想写很长一段话，来证明多么喜欢你，你对我有多么重要
+我暂时不写爱，因为怕你承受太大压力
+我写了写，改了又改
+发现还是只想说两句话
+"平安健康，天天开心"和"不要担心，我一直在你身边"</textarea>
     </div>
 
     <video id="camera-preview" playsinline muted autoplay></video>
@@ -163,6 +181,21 @@
         const TREE_R = 10;
         let audioCtx, musicTimer, isMusicPlaying = false;
         let clock = new THREE.Clock();
+
+        // --- 自动调整 textarea 高度函数（立即可用） ---
+        function autosizeTextarea(el) {
+            if (!el) return;
+            el.style.height = 'auto';
+            const sh = el.scrollHeight;
+            const minH = 48; // px，与 CSS min-height 保持一致
+            el.style.height = Math.max(sh, minH) + 'px';
+        }
+        // 绑定输入事件（元素在 DOM 中，script 在 body 底部，所以可以立即查询）
+        const globalTextarea = document.getElementById('bless-textarea');
+        if (globalTextarea) {
+            autosizeTextarea(globalTextarea);
+            globalTextarea.addEventListener('input', () => autosizeTextarea(globalTextarea));
+        }
 
         // --- 初始化 ---
         window.onload = async () => {
@@ -513,7 +546,21 @@
             state = newState;
             document.getElementById(activeUI).classList.add('active');
             handClench += (newClench - handClench) * 0.1;
-            box.style.display = (state === 'love') ? 'block' : 'none';
+
+            // 替换原本的单行显示控制，改为在显示时触发 autosize 并可选聚焦
+            if (state === 'love') {
+                if (box.style.display !== 'block') {
+                    box.style.display = 'block';
+                    const ta = box.querySelector('textarea');
+                    if (ta) {
+                        autosizeTextarea(ta);
+                        // 如果你希望打开时自动聚焦取消注释下一行
+                        // ta.focus();
+                    }
+                }
+            } else {
+                box.style.display = 'none';
+            }
         }
 
         // --- 6. 动画 Loop ---
@@ -705,4 +752,3 @@
     </script>
 </body>
 </html>
-
