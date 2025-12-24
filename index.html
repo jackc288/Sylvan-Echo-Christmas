@@ -114,9 +114,13 @@
     <div id="custom-message-box">
         <textarea id="bless-textarea">哈喽，mm
 圣诞快乐！
-我深深地感受到你是一个同理心很强很感性内心特别丰富的女孩子，但有时候确实单纯地让人心疼，让人很有保护欲呢
-我本来挺想写很长一段话，来证明多么喜欢你，你对我有多么重要
-我暂时不写爱，因为怕你承受太大压力
+我深深地感受到你是一个同理心很强很感性内心特别丰富的女孩子
+有时候很单纯可爱，有时候又很活泼调皮，真的惹人喜欢
+我知道你有时候也会很累，很无力，被情绪冲击的时候很需要安慰
+有时候很寂寞，没有方向感，觉得自己目前做的事情意义不大，感觉自己像一个"空心人"
+emmm真的让人忍不住怜爱，怎么有这样一个小傻瓜
+我本来挺想写很长很长一段话，来证明多么喜欢你，你多么好，多么值得被大家爱戴
+我暂时不写爱，因为这样你会承受压力
 我写了写，改了又改
 发现还是只想说两句话
 "平安健康，天天开心"和"不要担心，我一直在你身边"</textarea>
@@ -324,13 +328,13 @@
             // 真实比例猎户座
             const group = new THREE.Group();
             const stars = [
-                {p:[-3, 4, 0], c:0xFF5500, s:0.8}, // Betelgeuse (红超巨)
-                {p:[3, 2, 0], c:0x88CCFF, s:0.7},  // Bellatrix
-                {p:[-0.5, 0, 0], c:0xFFFFFF, s:0.6}, // Alnilam (腰带)
-                {p:[1, 0.5, 0], c:0xFFFFFF, s:0.6},  // Mintaka (腰带)
-                {p:[-2, -0.5, 0], c:0xFFFFFF, s:0.6}, // Alnitak (腰带)
-                {p:[-2, -5, 0], c:0x88CCFF, s:0.7},  // Saiph
-                {p:[4, -4, 0], c:0x99DDFF, s:0.9}    // Rigel (蓝超巨)
+                {p:[-3, 4, 0], c:0xFF5500, s:0.4}, // Betelgeuse (红超巨)
+                {p:[3, 2, 0], c:0x88CCFF, s:0.35},  // Bellatrix
+                {p:[-0.5, 0, 0], c:0xFFFFFF, s:0.3}, // Alnilam (腰带)
+                {p:[1, 0.5, 0], c:0xFFFFFF, s:0.3},  // Mintaka (腰带)
+                {p:[-2, -0.5, 0], c:0xFFFFFF, s:0.3}, // Alnitak (腰带)
+                {p:[-2, -5, 0], c:0x88CCFF, s:0.35},  // Saiph
+                {p:[4, -4, 0], c:0x99DDFF, s:0.45}    // Rigel (蓝超巨)
             ];
             const geo = new THREE.SphereGeometry(1, 16, 16);
             stars.forEach(d => {
@@ -606,7 +610,68 @@
 
             // 5. 文字 & 照片
             mmTextSprite.material.opacity = THREE.MathUtils.lerp(mmTextSprite.material.opacity, (state==='heart'?1:0), 0.1);
-            updatePhotos();
+            // --- 替换：根据相机选择最靠近屏幕的照片 ---
+        function getClosestPhoto() {
+            if (!photoMeshGroup || photoMeshGroup.children.length === 0) return null;
+            let closest = null;
+            let closestDist = Infinity;
+            const worldPos = new THREE.Vector3();
+            photoMeshGroup.children.forEach(m => {
+                m.getWorldPosition(worldPos); // 获取物体世界坐标
+                const d = camera.position.distanceTo(worldPos);
+                if (d < closestDist) {
+                    closestDist = d;
+                    closest = m;
+                }
+            });
+            return closest;
+        }
+        
+        function updatePhotos() {
+            // 如果处于 pinch 状态，动态选取离相机最近的一张照片作为目标
+            let target = null;
+            if (state === 'pinch' && photoMeshGroup.children.length > 0) {
+                target = getClosestPhoto();
+            }
+        
+            photoMeshGroup.children.forEach(m => {
+                if (state === 'firework') {
+                    // 随粒子漂浮
+                    m.position.y += Math.sin(clock.getElapsedTime() + (m.id || 0))*0.02;
+                    m.scale.setScalar(THREE.MathUtils.lerp(m.scale.x, 1, 0.1));
+                } else if (state === 'pinch' && m === target) {
+                    // 捏合放大 —— 选中最近照片，移动到相机前并放大
+                    // 计算目标世界位置（靠近相机的正前方位置）
+                    // 这里沿着相机前方向放置在相机前 r 单位处
+                    const r = 30; // 放到相机前方的距离（可调整）
+                    const camDir = new THREE.Vector3();
+                    camera.getWorldDirection(camDir); // 相机朝向（单位向量）
+                    const desiredWorldPos = new THREE.Vector3().copy(camera.position).add(camDir.multiplyScalar(r));
+        
+                    // 平滑移动到目标位置并面向相机
+                    m.position.lerp(desiredWorldPos, 0.1);
+                    m.lookAt(camera.position);
+                    m.scale.setScalar(THREE.MathUtils.lerp(m.scale.x, 3.5, 0.1));
+                } else if (state === 'tree') {
+                    const tp = m.userData.treePos;
+                    if (tp) {
+                        const a = clock.getElapsedTime()*0.2; // 随树旋转
+                        const x = tp.x*Math.cos(a) - tp.z*Math.sin(a);
+                        const z = tp.x*Math.sin(a) + tp.z*Math.cos(a);
+                        m.position.lerp(new THREE.Vector3(x, tp.y, z), 0.1);
+                        m.lookAt(0, tp.y, 0);
+                        m.scale.setScalar(THREE.MathUtils.lerp(m.scale.x, 1, 0.1));
+                    } else {
+                        // 若没有 treePos，退回到默认行为
+                        m.scale.setScalar(THREE.MathUtils.lerp(m.scale.x, 1, 0.1));
+                    }
+                } else {
+                    // 其他状态：缩小消失
+                    m.scale.setScalar(THREE.MathUtils.lerp(m.scale.x, 0, 0.2));
+                }
+            });
+        }
+        ;
 
             // 6. 角色 & 雪
             updateCharacter();
@@ -757,3 +822,4 @@
     </script>
 </body>
 </html>
+
